@@ -1,0 +1,15 @@
+# Ignore everything by default
+*
+
+# Keep this file tracked
+!.gitignore
+
+# Allow only these project paths to be tracked
+!wp-content/
+wp-content/*
+!wp-content/themes/
+!wp-content/themes/iei/
+!wp-content/themes/iei/**
+!wp-content/plugins/
+!wp-content/plugins/smooth-members/
+!wp-content/plugins/smooth-members/**
