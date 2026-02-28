@@ -13,3 +13,5 @@ wp-content/*
 !wp-content/plugins/
 !wp-content/plugins/smooth-members/
 !wp-content/plugins/smooth-members/**
+!wp-content/plugins/iei-membership/
+!wp-content/plugins/iei-membership/**
