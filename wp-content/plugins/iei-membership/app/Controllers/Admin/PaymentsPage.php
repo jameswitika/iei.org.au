@@ -5,6 +5,9 @@ namespace IEI\Membership\Controllers\Admin;
 use IEI\Membership\Services\PaymentActivationService;
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Admin payments queue for marking subscriptions as paid.
+ */
 class PaymentsPage
 {
     private string $menuSlug = 'iei-membership-payments';

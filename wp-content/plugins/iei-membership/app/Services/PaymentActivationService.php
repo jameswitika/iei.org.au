@@ -2,6 +2,9 @@
 
 namespace IEI\Membership\Services;
 
+/**
+ * Handles payment completion workflow and member activation side-effects.
+ */
 class PaymentActivationService
 {
     private ActivityLogger $activityLogger;
@@ -11,6 +14,9 @@ class PaymentActivationService
         $this->activityLogger = $activityLogger;
     }
 
+    /**
+     * Mark a subscription as paid and transition the member to active state.
+     */
     public function mark_subscription_paid(int $subscriptionId, ?int $actorUserId = null, string $reference = ''): array
     {
         global $wpdb;
@@ -167,6 +173,12 @@ class PaymentActivationService
         $user->set_role('iei_member');
     }
 
+    /**
+     * Send activation email after payment is marked paid.
+     *
+     * Email includes membership details and a destination URL that prefers
+     * configured member-home page settings.
+     */
     private function send_payment_confirmation(int $wpUserId, string $membershipNumber, array $subscription, float $amount): bool
     {
         $user = get_user_by('id', $wpUserId);
@@ -200,6 +212,9 @@ class PaymentActivationService
         return (bool) wp_mail($user->user_email, $subject, $message);
     }
 
+    /**
+     * Resolve member destination URL for email content.
+     */
     private function member_home_or_login_url(): string
     {
         $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
@@ -221,6 +236,9 @@ class PaymentActivationService
         return wp_login_url();
     }
 
+    /**
+     * Ensure member has a unique membership number and return it.
+     */
     private function ensure_membership_number(array $member): string
     {
         $current = trim((string) ($member['membership_number'] ?? ''));
@@ -245,6 +263,12 @@ class PaymentActivationService
         return $next;
     }
 
+    /**
+     * Compute next membership number using both configured counter and DB state.
+     *
+     * The larger of configured-next and detected-max+1 is used to avoid
+     * duplicates when settings are lowered or data is imported.
+     */
     private function next_membership_number(): string
     {
         global $wpdb;
@@ -272,6 +296,9 @@ class PaymentActivationService
         return 'IEI-' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * Persist the next numeric value to settings after assigning a member number.
+     */
     private function persist_next_membership_number(int $nextNumber, array $settings = []): void
     {
         $settings = is_array($settings) ? $settings : [];

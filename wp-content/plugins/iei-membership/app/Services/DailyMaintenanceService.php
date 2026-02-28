@@ -2,6 +2,9 @@
 
 namespace IEI\Membership\Services;
 
+/**
+ * Daily lifecycle maintenance for subscription overdue/lapse transitions.
+ */
 class DailyMaintenanceService
 {
     private ActivityLogger $activityLogger;
@@ -31,6 +34,9 @@ class DailyMaintenanceService
         }
     }
 
+    /**
+     * Execute daily status transitions based on due dates and grace windows.
+     */
     public function run_daily_maintenance(): void
     {
         $today = current_time('Y-m-d');

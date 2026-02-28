@@ -6,6 +6,11 @@ use IEI\Membership\Services\RolesManager;
 
 class SettingsPage
 {
+    /**
+     * Single settings controller for IEI Membership plugin options.
+     *
+     * Values are stored as one option array and normalized through sanitize().
+     */
     private string $optionKey;
     private string $group = 'iei_membership_settings_group';
     private string $slug = 'iei-membership-settings';
@@ -186,6 +191,12 @@ class SettingsPage
         );
     }
 
+    /**
+     * Sanitize and normalize the full settings payload before persistence.
+     *
+     * This method is intentionally strict so downstream services can assume
+     * numeric fields are bounded and structural keys always exist.
+     */
     public function sanitize($input): array
     {
         if (! current_user_can(RolesManager::CAP_MANAGE_SETTINGS)) {
@@ -245,6 +256,9 @@ class SettingsPage
         ];
     }
 
+    /**
+     * Return saved settings merged with defaults, including nested price keys.
+     */
     private function get_settings(): array
     {
         $saved = get_option($this->optionKey, []);

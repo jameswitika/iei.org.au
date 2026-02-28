@@ -5,6 +5,9 @@ namespace IEI\Membership\Controllers\Frontend;
 use IEI\Membership\Services\ActivityLogger;
 use IEI\Membership\Services\FileStorageService;
 
+/**
+ * Public application form shortcode and submission handler.
+ */
 class ApplicationShortcodeController
 {
     private const NONCE_ACTION = 'iei_membership_application_submit';
@@ -23,6 +26,9 @@ class ApplicationShortcodeController
         add_shortcode('iei_membership_application', [$this, 'render_shortcode']);
     }
 
+    /**
+     * Render form and display validation/success state for current request.
+     */
     public function render_shortcode(): string
     {
         $result = $this->maybe_handle_submission();

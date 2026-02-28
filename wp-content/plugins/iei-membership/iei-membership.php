@@ -22,6 +22,9 @@ define('IEI_MEMBERSHIP_URL', plugin_dir_url(__FILE__));
 define('IEI_MEMBERSHIP_OPTION_KEY', 'iei_membership_settings');
 define('IEI_MEMBERSHIP_DB_VERSION_OPTION_KEY', 'iei_membership_db_version');
 
+/**
+ * Lightweight autoloader for IEI Membership namespaced classes.
+ */
 spl_autoload_register(static function (string $class): void {
     $namespace = 'IEI\\Membership\\';
 
@@ -38,6 +41,9 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+/**
+ * Default plugin settings used on first install and as merge fallbacks.
+ */
 function iei_membership_default_settings(): array
 {
     return [

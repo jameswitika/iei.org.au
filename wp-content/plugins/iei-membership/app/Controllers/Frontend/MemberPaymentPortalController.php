@@ -4,6 +4,9 @@ namespace IEI\Membership\Controllers\Frontend;
 
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Frontend payment portal for pending-payment/lapsed member accounts.
+ */
 class MemberPaymentPortalController
 {
     public function register_hooks(): void

@@ -6,6 +6,9 @@ use IEI\Membership\Services\ActivityLogger;
 use IEI\Membership\Services\FileStorageService;
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Admin UI/controller for reviewing applications and board workflow actions.
+ */
 class ApplicationsPage
 {
     private string $menuSlug = 'iei-membership-applications';
@@ -18,6 +21,9 @@ class ApplicationsPage
         $this->activityLogger = $activityLogger;
     }
 
+    /**
+     * Register admin-post handlers for application workflow actions.
+     */
     public function register_hooks(): void
     {
         add_action('admin_post_iei_membership_application_decision', [$this, 'handle_decision_post']);

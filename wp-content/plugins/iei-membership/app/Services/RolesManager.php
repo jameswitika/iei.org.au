@@ -2,6 +2,9 @@
 
 namespace IEI\Membership\Services;
 
+/**
+ * Defines plugin roles/capabilities and runtime capability filtering.
+ */
 class RolesManager
 {
     public const DIRECTOR_DISABLED_META_KEY = 'iei_director_disabled';
@@ -20,6 +23,9 @@ class RolesManager
     public const CAP_ACCESS_MEMBER_PORTAL = 'iei_access_member_portal';
     public const CAP_ACCESS_PAYMENT_PORTAL = 'iei_access_payment_portal';
 
+    /**
+     * Ensure plugin roles exist and required capabilities are assigned.
+     */
     public static function register_roles_and_capabilities(): void
     {
         $allManagementCaps = self::management_capabilities();

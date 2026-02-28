@@ -2,8 +2,14 @@
 
 namespace IEI\Membership\Services;
 
+/**
+ * Handles protected file persistence and metadata registration.
+ */
 class FileStorageService
 {
+    /**
+     * Validate and store an uploaded application file in protected storage.
+     */
     public function store_application_file(int $applicationId, array $uploadedFile, string $fileLabel = '', ?int $uploadedByUserId = null): int
     {
         if ($applicationId <= 0) {

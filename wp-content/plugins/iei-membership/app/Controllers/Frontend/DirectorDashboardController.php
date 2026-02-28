@@ -7,6 +7,9 @@ use IEI\Membership\Services\BoardDecisionService;
 use IEI\Membership\Services\FileStorageService;
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Frontend dashboard for directors to review applications and cast votes.
+ */
 class DirectorDashboardController
 {
     private const NONCE_ACTION = 'iei_director_vote_submit';

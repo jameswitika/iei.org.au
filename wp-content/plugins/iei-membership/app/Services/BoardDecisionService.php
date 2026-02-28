@@ -2,6 +2,9 @@
 
 namespace IEI\Membership\Services;
 
+/**
+ * Finalizes board outcomes and provisions downstream member/payment records.
+ */
 class BoardDecisionService
 {
     private ActivityLogger $activityLogger;
@@ -11,6 +14,9 @@ class BoardDecisionService
         $this->activityLogger = $activityLogger;
     }
 
+    /**
+     * Recompute board vote totals and finalize application when threshold is reached.
+     */
     public function evaluate_after_vote(int $applicationId, ?int $actorUserId = null): array
     {
         global $wpdb;

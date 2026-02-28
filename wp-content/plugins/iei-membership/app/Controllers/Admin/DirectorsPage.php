@@ -4,6 +4,9 @@ namespace IEI\Membership\Controllers\Admin;
 
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Admin management for director user assignment and enable/disable state.
+ */
 class DirectorsPage
 {
     private string $menuSlug = 'iei-membership-directors';

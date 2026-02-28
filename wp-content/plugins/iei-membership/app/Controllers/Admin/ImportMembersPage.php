@@ -5,6 +5,9 @@ namespace IEI\Membership\Controllers\Admin;
 use IEI\Membership\Services\ActivityLogger;
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Admin CSV importer for onboarding member/user/subscription records.
+ */
 class ImportMembersPage
 {
     private const REQUIRED_COLUMNS = ['email', 'first_name', 'last_name', 'membership_number', 'membership_type', 'membership_year'];

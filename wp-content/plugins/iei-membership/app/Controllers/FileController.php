@@ -5,6 +5,9 @@ namespace IEI\Membership\Controllers;
 use IEI\Membership\Services\FileStorageService;
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Serves protected application files through authorized streaming endpoint.
+ */
 class FileController
 {
     private FileStorageService $fileStorageService;
@@ -19,6 +22,9 @@ class FileController
         add_action('admin_post_iei_membership_stream_file', [$this, 'stream_file']);
     }
 
+    /**
+     * Validate request, authorize user, then stream a protected file response.
+     */
     public function stream_file(): void
     {
         if (! is_user_logged_in()) {

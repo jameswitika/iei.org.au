@@ -18,6 +18,9 @@ use IEI\Membership\Services\FileStorageService;
 use IEI\Membership\Services\PaymentActivationService;
 use IEI\Membership\Services\RolesManager;
 
+/**
+ * Plugin runtime bootstrap: wires services, controllers, menus, and hooks.
+ */
 class Bootstrap
 {
     private ?SettingsPage $settingsPage = null;
@@ -31,6 +34,9 @@ class Bootstrap
     private ?ImportMembersPage $importMembersPage = null;
     private ?DailyMaintenanceService $dailyMaintenanceService = null;
 
+    /**
+     * Activation bootstrap: ensure roles, schema, and cron are ready.
+     */
     public static function activate(): void
     {
         try {
@@ -47,6 +53,9 @@ class Bootstrap
         DailyMaintenanceService::unschedule_event();
     }
 
+    /**
+     * Runtime bootstrap for every request after plugin load.
+     */
     public function run(): void
     {
         RolesManager::register_roles_and_capabilities();
@@ -289,6 +298,14 @@ class Bootstrap
         ]);
     }
 
+    /**
+     * Route users to role-appropriate frontend destinations after login.
+     *
+     * Priority order:
+     * 1) Directors with voting capability -> director dashboard page.
+     * 2) Membership users -> payment portal or member home, based on status.
+     * 3) Anything else -> preserve the original WordPress redirect.
+     */
     public function handle_login_redirect(string $redirectTo, string $requestedRedirectTo, $user): string
     {
         if (! $user instanceof \WP_User) {
@@ -309,6 +326,9 @@ class Bootstrap
         return $redirectTo;
     }
 
+    /**
+     * Resolve membership-specific login destination from member and subscription state.
+     */
     private function membership_login_redirect_url(\WP_User $user): string
     {
         $member = $this->get_member_by_wp_user_id((int) $user->ID);
@@ -339,6 +359,9 @@ class Bootstrap
         return '';
     }
 
+    /**
+     * Resolve director dashboard URL using configured page first, then shortcode discovery.
+     */
     private function director_dashboard_url(): string
     {
         $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
@@ -380,6 +403,9 @@ class Bootstrap
         return home_url('/');
     }
 
+    /**
+     * Resolve payment portal URL using configured page first, then shortcode discovery.
+     */
     private function member_payment_portal_url(): string
     {
         $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
@@ -404,6 +430,9 @@ class Bootstrap
         return home_url('/');
     }
 
+    /**
+     * Resolve member-home URL from settings, with a stable public-path fallback.
+     */
     private function member_home_url(): string
     {
         $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
@@ -420,6 +449,9 @@ class Bootstrap
         return home_url('/member-portal/');
     }
 
+    /**
+     * Fetch plugin member row for a WordPress user.
+     */
     private function get_member_by_wp_user_id(int $wpUserId): ?array
     {
         if ($wpUserId <= 0) {
@@ -436,6 +468,9 @@ class Bootstrap
         return is_array($row) ? $row : null;
     }
 
+    /**
+     * Return the latest known subscription status for redirect decisions.
+     */
     private function latest_subscription_status(int $memberId): string
     {
         if ($memberId <= 0) {
@@ -458,6 +493,11 @@ class Bootstrap
         return is_string($status) ? sanitize_key($status) : '';
     }
 
+    /**
+     * Find the first published page containing a shortcode prefix.
+     *
+     * Prefix matching allows attributes in shortcodes, e.g. [shortcode foo="bar"].
+     */
     private function first_published_page_with_shortcode(string $shortcodePrefix): int
     {
         if ($shortcodePrefix === '') {

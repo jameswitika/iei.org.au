@@ -2,8 +2,14 @@
 
 namespace IEI\Membership\Migrations;
 
+/**
+ * Creates/updates IEI Membership custom tables using dbDelta.
+ */
 class Migrator
 {
+    /**
+     * Run idempotent schema migration when DB version is outdated.
+     */
     public static function migrate(): void
     {
         global $wpdb;

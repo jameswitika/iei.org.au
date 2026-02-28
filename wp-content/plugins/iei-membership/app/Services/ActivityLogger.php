@@ -2,6 +2,9 @@
 
 namespace IEI\Membership\Services;
 
+/**
+ * Centralized writer for application/member/system audit events.
+ */
 class ActivityLogger
 {
     public function log_application_event(int $applicationId, string $eventType, array $context = [], ?int $actorUserId = null): void
@@ -19,6 +22,9 @@ class ActivityLogger
         $this->log_event($eventType, $context, $actorUserId, null, null);
     }
 
+    /**
+     * Persist one normalized event row into the activity log table.
+     */
     public function log_event(string $eventType, array $context = [], ?int $actorUserId = null, ?int $applicationId = null, ?int $memberId = null): void
     {
         global $wpdb;
