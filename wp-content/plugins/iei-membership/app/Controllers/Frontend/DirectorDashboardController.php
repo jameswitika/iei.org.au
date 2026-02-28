@@ -145,23 +145,28 @@ class DirectorDashboardController
         }
 
         echo '<h3>' . esc_html__('Submit Vote', 'iei-membership') . '</h3>';
-        echo '<form method="post">';
-        wp_nonce_field(self::NONCE_ACTION, '_iei_director_nonce');
-        echo '<input type="hidden" name="iei_director_action" value="submit_vote" />';
-        echo '<input type="hidden" name="application_id" value="' . esc_attr((string) $applicationId) . '" />';
+        $currentVote = (string) ($application['vote'] ?? 'unanswered');
+        if (in_array($currentVote, ['approved', 'rejected'], true)) {
+            echo '<p>' . esc_html__('You have already submitted your vote. Contact an administrator if a reset is required.', 'iei-membership') . '</p>';
+        } else {
+            echo '<form method="post">';
+            wp_nonce_field(self::NONCE_ACTION, '_iei_director_nonce');
+            echo '<input type="hidden" name="iei_director_action" value="submit_vote" />';
+            echo '<input type="hidden" name="application_id" value="' . esc_attr((string) $applicationId) . '" />';
 
-        echo '<p>';
-        echo '<label><input type="radio" name="vote" value="approved" ' . checked((string) $application['vote'], 'approved', false) . ' required /> ' . esc_html__('Approve', 'iei-membership') . '</label><br />';
-        echo '<label><input type="radio" name="vote" value="rejected" ' . checked((string) $application['vote'], 'rejected', false) . ' required /> ' . esc_html__('Reject', 'iei-membership') . '</label>';
-        echo '</p>';
+            echo '<p>';
+            echo '<label><input type="radio" name="vote" value="approved" ' . checked((string) $application['vote'], 'approved', false) . ' required /> ' . esc_html__('Approve', 'iei-membership') . '</label><br />';
+            echo '<label><input type="radio" name="vote" value="rejected" ' . checked((string) $application['vote'], 'rejected', false) . ' required /> ' . esc_html__('Reject', 'iei-membership') . '</label>';
+            echo '</p>';
 
-        echo '<p>';
-        echo '<label for="iei_director_comment">' . esc_html__('Comment (optional)', 'iei-membership') . '</label><br />';
-        echo '<textarea id="iei_director_comment" name="comment" rows="4">' . esc_textarea((string) ($application['note'] ?? '')) . '</textarea>';
-        echo '</p>';
+            echo '<p>';
+            echo '<label for="iei_director_comment">' . esc_html__('Comment (optional)', 'iei-membership') . '</label><br />';
+            echo '<textarea id="iei_director_comment" name="comment" rows="4">' . esc_textarea((string) ($application['note'] ?? '')) . '</textarea>';
+            echo '</p>';
 
-        echo '<p><button type="submit">' . esc_html__('Save Vote', 'iei-membership') . '</button></p>';
-        echo '</form>';
+            echo '<p><button type="submit">' . esc_html__('Save Vote', 'iei-membership') . '</button></p>';
+            echo '</form>';
+        }
 
         return (string) ob_get_clean();
     }
@@ -197,6 +202,11 @@ class DirectorDashboardController
 
         if ((string) $application['status'] !== 'pending_board_approval') {
             $this->redirect_with_notice('invalid_status', $applicationId);
+        }
+
+        $existingVote = (string) ($application['vote'] ?? 'unanswered');
+        if (in_array($existingVote, ['approved', 'rejected'], true)) {
+            $this->redirect_with_notice('vote_locked', $applicationId);
         }
 
         global $wpdb;
@@ -384,6 +394,7 @@ class DirectorDashboardController
             'vote_saved' => __('Your vote has been saved.', 'iei-membership'),
             'application_finalized_approved' => __('Your vote was saved and the application has been approved by threshold.', 'iei-membership'),
             'application_finalized_rejected' => __('Your vote was saved and the application has been rejected by threshold.', 'iei-membership'),
+            'vote_locked' => __('You have already submitted a vote for this application. Ask an administrator to reset it if needed.', 'iei-membership'),
             'invalid_nonce' => __('Invalid token. Please try again.', 'iei-membership'),
             'invalid_vote' => __('Invalid vote request.', 'iei-membership'),
             'not_found' => __('Application not found.', 'iei-membership'),
@@ -396,7 +407,7 @@ class DirectorDashboardController
             return;
         }
 
-        $isError = in_array($updated, ['invalid_nonce', 'invalid_vote', 'not_found', 'invalid_status', 'save_failed', 'forbidden'], true);
+        $isError = in_array($updated, ['vote_locked', 'invalid_nonce', 'invalid_vote', 'not_found', 'invalid_status', 'save_failed', 'forbidden'], true);
         $class = $isError ? 'iei-membership-notice iei-membership-notice-error' : 'iei-membership-notice iei-membership-notice-success';
         echo '<div class="' . esc_attr($class) . '"><p>' . esc_html($messages[$updated]) . '</p></div>';
     }

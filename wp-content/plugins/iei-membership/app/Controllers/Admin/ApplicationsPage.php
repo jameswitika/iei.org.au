@@ -305,7 +305,7 @@ class ApplicationsPage
 
                 echo '<tr>';
                 echo '<td>' . esc_html((string) ($vote['display_name'] ?: $vote['user_email'] ?: ('User #' . $directorId))) . '</td>';
-                echo '<td>' . esc_html((string) ($vote['vote'] ?? 'unanswered')) . '</td>';
+                echo '<td>' . $this->render_vote_chip((string) ($vote['vote'] ?? 'unanswered')) . '</td>';
                 echo '<td>' . esc_html((string) (($vote['responded_at'] ?? '') ?: '-')) . '</td>';
                 echo '<td>' . esc_html((string) (($vote['reset_at'] ?? '') ?: '-')) . '</td>';
                 echo '<td>' . esc_html((string) (($vote['reset_by_display_name'] ?? '') ?: '-')) . '</td>';
@@ -812,6 +812,30 @@ class ApplicationsPage
         ];
     }
 
+    
+        private function render_vote_chip(string $vote): string
+        {
+            $vote = sanitize_key($vote);
+
+            $styles = [
+                'approved' => [
+                    'label' => __('approved', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#dcfce7;color:#166534;font-weight:600;text-transform:capitalize;',
+                ],
+                'rejected' => [
+                    'label' => __('rejected', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#fee2e2;color:#991b1b;font-weight:600;text-transform:capitalize;',
+                ],
+                'unanswered' => [
+                    'label' => __('unanswered', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#e5e7eb;color:#374151;font-weight:600;text-transform:capitalize;',
+                ],
+            ];
+
+            $meta = $styles[$vote] ?? $styles['unanswered'];
+
+            return '<span style="' . esc_attr($meta['style']) . '">' . esc_html((string) $meta['label']) . '</span>';
+        }
     private function list_url(): string
     {
         return admin_url('admin.php?page=' . $this->menuSlug);
