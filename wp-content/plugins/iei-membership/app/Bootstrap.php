@@ -6,6 +6,7 @@ use IEI\Membership\Controllers\Admin\SettingsPage;
 use IEI\Membership\Controllers\Admin\ApplicationsPage;
 use IEI\Membership\Controllers\Admin\DirectorsPage;
 use IEI\Membership\Controllers\Admin\ImportMembersPage;
+use IEI\Membership\Controllers\Admin\MembersPage;
 use IEI\Membership\Controllers\Admin\PaymentsPage;
 use IEI\Membership\Controllers\FileController;
 use IEI\Membership\Controllers\Frontend\ApplicationShortcodeController;
@@ -30,6 +31,7 @@ class Bootstrap
     private ?MemberPaymentPortalController $memberPaymentPortalController = null;
     private ?ApplicationsPage $applicationsPage = null;
     private ?DirectorsPage $directorsPage = null;
+    private ?MembersPage $membersPage = null;
     private ?PaymentsPage $paymentsPage = null;
     private ?ImportMembersPage $importMembersPage = null;
     private ?DailyMaintenanceService $dailyMaintenanceService = null;
@@ -79,6 +81,8 @@ class Bootstrap
         $this->applicationsPage->register_hooks();
         $this->directorsPage = new DirectorsPage();
         $this->directorsPage->register_hooks();
+        $this->membersPage = new MembersPage();
+        $this->membersPage->register_hooks();
         $this->paymentsPage = new PaymentsPage(new PaymentActivationService(new ActivityLogger()));
         $this->paymentsPage->register_hooks();
         $this->importMembersPage = new ImportMembersPage(new ActivityLogger());
@@ -211,6 +215,12 @@ class Bootstrap
     public function render_members_page(): void
     {
         $this->assert_capability(RolesManager::CAP_MANAGE_MEMBERS);
+
+        if ($this->membersPage) {
+            $this->membersPage->render();
+            return;
+        }
+
         $this->render_scaffold_page(__('Members', 'iei-membership'));
     }
 
