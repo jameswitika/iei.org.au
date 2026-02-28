@@ -37,6 +37,8 @@ class ApplicationShortcodeController
         $old = $result['old'];
 
         $membershipType = isset($old['membership_type']) ? (string) $old['membership_type'] : 'associate';
+        $nominationStatus = isset($old['nomination_status']) ? (string) $old['nomination_status'] : 'self_nominated';
+        $contactUrl = home_url('/contact-us/');
 
         ob_start();
 
@@ -53,6 +55,23 @@ class ApplicationShortcodeController
             echo '</ul></div>';
         }
 
+        echo '<style>
+            .iei-app-form{max-width:980px}
+            .iei-app-form .iei-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+            .iei-app-form .iei-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+            .iei-app-form .iei-full{grid-column:1/-1}
+            .iei-app-form label{font-weight:600;display:block;margin-bottom:6px}
+            .iei-app-form input[type=text],.iei-app-form input[type=email],.iei-app-form select,.iei-app-form textarea{width:100%;padding:10px 12px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box}
+            .iei-app-form textarea{min-height:110px}
+            .iei-app-form .iei-section{margin:18px 0}
+            .iei-app-form .iei-card{padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+            .iei-app-form .iei-help{font-size:13px;color:#555;margin-top:6px}
+            @media (max-width:900px){.iei-app-form .iei-grid,.iei-app-form .iei-grid-2{grid-template-columns:1fr}}
+        </style>';
+
+        echo '<div class="iei-app-form">';
+        echo '<p>' . esc_html__('Please fill out the form below to apply to become a member. If your application is successful, you will be notified and sent a link to make your payment for membership. If you have any questions, please use our contact us form to get in contact.', 'iei-membership') . ' <a href="' . esc_url($contactUrl) . '">' . esc_html__('Contact us', 'iei-membership') . '</a>.</p>';
+
         echo '<form method="post" enctype="multipart/form-data" class="iei-membership-application-form">';
         wp_nonce_field(self::NONCE_ACTION, '_iei_membership_nonce');
         echo '<input type="hidden" name="iei_membership_action" value="submit_application" />';
@@ -62,62 +81,84 @@ class ApplicationShortcodeController
         echo '<input type="text" id="iei_membership_website" name="iei_membership_website" value="" autocomplete="off" tabindex="-1" />';
         echo '</p>';
 
-        echo '<p>';
-        echo '<label for="iei_first_name">' . esc_html__('First Name', 'iei-membership') . '</label><br />';
-        echo '<input required type="text" id="iei_first_name" name="first_name" value="' . esc_attr($old['first_name'] ?? '') . '" />';
-        echo '</p>';
-
-        echo '<p>';
-        echo '<label for="iei_last_name">' . esc_html__('Last Name', 'iei-membership') . '</label><br />';
-        echo '<input required type="text" id="iei_last_name" name="last_name" value="' . esc_attr($old['last_name'] ?? '') . '" />';
-        echo '</p>';
-
-        echo '<p>';
-        echo '<label for="iei_email">' . esc_html__('Email Address', 'iei-membership') . '</label><br />';
-        echo '<input required type="email" id="iei_email" name="email" value="' . esc_attr($old['email'] ?? '') . '" />';
-        echo '</p>';
-
-        echo '<p>';
-        echo '<label for="iei_membership_type">' . esc_html__('Membership Type', 'iei-membership') . '</label><br />';
-        echo '<select required id="iei_membership_type" name="membership_type">';
+        echo '<div class="iei-grid iei-section">';
+        echo '<div><label for="iei_first_name">' . esc_html__('First Name', 'iei-membership') . '</label><input required type="text" id="iei_first_name" name="first_name" value="' . esc_attr($old['first_name'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_middle_name">' . esc_html__('Middle Name', 'iei-membership') . '</label><input type="text" id="iei_middle_name" name="middle_name" value="' . esc_attr($old['middle_name'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_last_name">' . esc_html__('Last Name', 'iei-membership') . '</label><input required type="text" id="iei_last_name" name="last_name" value="' . esc_attr($old['last_name'] ?? '') . '" /></div>';
+        echo '<div class="iei-full"><label for="iei_address_1">' . esc_html__('Address Line 1', 'iei-membership') . '</label><input required type="text" id="iei_address_1" name="address_line_1" value="' . esc_attr($old['address_line_1'] ?? '') . '" /></div>';
+        echo '<div class="iei-full"><label for="iei_address_2">' . esc_html__('Address Line 2', 'iei-membership') . '</label><input type="text" id="iei_address_2" name="address_line_2" value="' . esc_attr($old['address_line_2'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_suburb">' . esc_html__('Suburb', 'iei-membership') . '</label><input required type="text" id="iei_suburb" name="suburb" value="' . esc_attr($old['suburb'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_state">' . esc_html__('State', 'iei-membership') . '</label><select required id="iei_state" name="state"><option value="">' . esc_html__('Select state', 'iei-membership') . '</option>';
+        foreach ($this->australian_states() as $stateCode => $stateLabel) {
+            echo '<option value="' . esc_attr($stateCode) . '" ' . selected((string) ($old['state'] ?? ''), $stateCode, false) . '>' . esc_html($stateLabel) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div><label for="iei_postcode">' . esc_html__('Postcode', 'iei-membership') . '</label><input required type="text" id="iei_postcode" name="postcode" value="' . esc_attr($old['postcode'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_phone">' . esc_html__('Phone', 'iei-membership') . '</label><input type="text" id="iei_phone" name="phone" value="' . esc_attr($old['phone'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_mobile">' . esc_html__('Mobile', 'iei-membership') . '</label><input type="text" id="iei_mobile" name="mobile" value="' . esc_attr($old['mobile'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_email">' . esc_html__('Email Address', 'iei-membership') . '</label><input required type="email" id="iei_email" name="email" value="' . esc_attr($old['email'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_employer">' . esc_html__('Employer', 'iei-membership') . '</label><input type="text" id="iei_employer" name="employer" value="' . esc_attr($old['employer'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_job_position">' . esc_html__('Job Position', 'iei-membership') . '</label><input type="text" id="iei_job_position" name="job_position" value="' . esc_attr($old['job_position'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_membership_type">' . esc_html__('Membership Type', 'iei-membership') . '</label><select required id="iei_membership_type" name="membership_type">';
         foreach ($this->allowed_membership_types() as $typeValue => $typeLabel) {
             echo '<option value="' . esc_attr($typeValue) . '" ' . selected($membershipType, $typeValue, false) . '>' . esc_html($typeLabel) . '</option>';
         }
-        echo '</select>';
-        echo '</p>';
+        echo '</select></div>';
+        echo '</div>';
 
-        echo '<p>';
-        echo '<label for="iei_employer">' . esc_html__('Employer', 'iei-membership') . '</label><br />';
-        echo '<input type="text" id="iei_employer" name="employer" value="' . esc_attr($old['employer'] ?? '') . '" />';
-        echo '</p>';
-
-        echo '<p>';
-        echo '<label for="iei_job_position">' . esc_html__('Job Position', 'iei-membership') . '</label><br />';
-        echo '<input type="text" id="iei_job_position" name="job_position" value="' . esc_attr($old['job_position'] ?? '') . '" />';
-        echo '</p>';
-
-        echo '<p>';
-        echo '<label for="iei_nomination_status">' . esc_html__('Nomination Status', 'iei-membership') . '</label><br />';
+        echo '<div class="iei-section iei-card">';
+        echo '<h3 style="margin-top:0;">' . esc_html__('NOMINATED BY –', 'iei-membership') . '</h3>';
+        echo '<p style="margin-top:0;">' . esc_html__('Nominated By - I, the undersigned member, hereby nominate the applicant above for admission as a member of the Institute of Electrical Inspectors Australia', 'iei-membership') . '</p>';
+        echo '<label for="iei_nomination_status">' . esc_html__('Nomination Status', 'iei-membership') . '</label>';
         echo '<select id="iei_nomination_status" name="nomination_status">';
         foreach ($this->nomination_statuses() as $statusValue => $statusLabel) {
-            $selected = selected((string) ($old['nomination_status'] ?? 'not_specified'), $statusValue, false);
+            $selected = selected($nominationStatus, $statusValue, false);
             echo '<option value="' . esc_attr($statusValue) . '" ' . $selected . '>' . esc_html($statusLabel) . '</option>';
         }
         echo '</select>';
-        echo '</p>';
+        echo '<p class="iei-help">' . esc_html__('Select "Self nominated" if you do not know a member that can nominate you. The IEI Secretary will organise this for you.', 'iei-membership') . '</p>';
 
-        echo '<p>';
-        echo '<label for="iei_application_notes">' . esc_html__('Application Notes', 'iei-membership') . '</label><br />';
+        $showNominator = $nominationStatus === 'nominated_by_member';
+        echo '<div id="iei_nominator_fields" class="iei-grid-2" style="margin-top:10px;' . ($showNominator ? '' : 'display:none;') . '">';
+        echo '<div><label for="iei_nominating_member_number">' . esc_html__('Nominating Member Number', 'iei-membership') . '</label><input type="text" id="iei_nominating_member_number" name="nominating_member_number" value="' . esc_attr($old['nominating_member_number'] ?? '') . '" /></div>';
+        echo '<div><label for="iei_nominating_member_name">' . esc_html__('Nominating Member Name (Full)', 'iei-membership') . '</label><input type="text" id="iei_nominating_member_name" name="nominating_member_name" value="' . esc_attr($old['nominating_member_name'] ?? '') . '" /></div>';
+        echo '</div>';
+        echo '</div>';
+
+        echo '<div class="iei-section iei-card">';
+        echo '<h3 style="margin-top:0;">' . esc_html__('DECLARATION BY APPLICANT', 'iei-membership') . '</h3>';
+        echo '<p>' . esc_html__('I desire to become a member of the Institute of Electrical Inspectors, confirm that the information provided on this form is true and correct and if admitted to membership agree to support and protect the professional status, rights and responsibilities of the Institute of Electrical Inspectors and abide by the Constitution of the Institute and the IEI members Code of Conduct.', 'iei-membership') . '</p>';
+        echo '<label for="iei_signature_text">' . esc_html__('Signature (Type Full Name)', 'iei-membership') . '</label>';
+        echo '<input required type="text" id="iei_signature_text" name="signature_text" value="' . esc_attr($old['signature_text'] ?? '') . '" />';
+        echo '</div>';
+
+        echo '<div class="iei-section">';
+        echo '<label for="iei_application_notes">' . esc_html__('Application Notes', 'iei-membership') . '</label>';
         echo '<textarea id="iei_application_notes" name="application_notes" rows="5">' . esc_textarea($old['application_notes'] ?? '') . '</textarea>';
-        echo '</p>';
+        echo '</div>';
 
-        echo '<p>';
-        echo '<label for="iei_application_files">' . esc_html__('Attachments (max 5 files, 5MB each)', 'iei-membership') . '</label><br />';
+        echo '<div class="iei-section">';
+        echo '<label for="iei_application_files">' . esc_html__('Attachments (max 5 files, 5MB each)', 'iei-membership') . '</label>';
         echo '<input type="file" id="iei_application_files" name="application_files[]" multiple />';
-        echo '</p>';
+        echo '</div>';
 
         echo '<p><button type="submit">' . esc_html__('Submit Application', 'iei-membership') . '</button></p>';
         echo '</form>';
+        echo '</div>';
+
+        echo '<script>
+            (function(){
+                var nomination = document.getElementById("iei_nomination_status");
+                var nominatorFields = document.getElementById("iei_nominator_fields");
+                if(!nomination || !nominatorFields){ return; }
+                function toggleNominator(){
+                    var show = nomination.value === "nominated_by_member";
+                    nominatorFields.style.display = show ? "grid" : "none";
+                }
+                nomination.addEventListener("change", toggleNominator);
+                toggleNominator();
+            })();
+        </script>';
 
         return (string) ob_get_clean();
     }
@@ -135,12 +176,23 @@ class ApplicationShortcodeController
 
         $response['old'] = [
             'first_name' => sanitize_text_field(wp_unslash((string) ($_POST['first_name'] ?? ''))),
+            'middle_name' => sanitize_text_field(wp_unslash((string) ($_POST['middle_name'] ?? ''))),
             'last_name' => sanitize_text_field(wp_unslash((string) ($_POST['last_name'] ?? ''))),
+            'address_line_1' => sanitize_text_field(wp_unslash((string) ($_POST['address_line_1'] ?? ''))),
+            'address_line_2' => sanitize_text_field(wp_unslash((string) ($_POST['address_line_2'] ?? ''))),
+            'suburb' => sanitize_text_field(wp_unslash((string) ($_POST['suburb'] ?? ''))),
+            'state' => sanitize_key(wp_unslash((string) ($_POST['state'] ?? ''))),
+            'postcode' => sanitize_text_field(wp_unslash((string) ($_POST['postcode'] ?? ''))),
+            'phone' => sanitize_text_field(wp_unslash((string) ($_POST['phone'] ?? ''))),
+            'mobile' => sanitize_text_field(wp_unslash((string) ($_POST['mobile'] ?? ''))),
             'email' => sanitize_email(wp_unslash((string) ($_POST['email'] ?? ''))),
             'membership_type' => sanitize_key(wp_unslash((string) ($_POST['membership_type'] ?? ''))),
             'employer' => sanitize_text_field(wp_unslash((string) ($_POST['employer'] ?? ''))),
             'job_position' => sanitize_text_field(wp_unslash((string) ($_POST['job_position'] ?? ''))),
-            'nomination_status' => sanitize_key(wp_unslash((string) ($_POST['nomination_status'] ?? 'not_specified'))),
+            'nomination_status' => sanitize_key(wp_unslash((string) ($_POST['nomination_status'] ?? 'self_nominated'))),
+            'nominating_member_number' => sanitize_text_field(wp_unslash((string) ($_POST['nominating_member_number'] ?? ''))),
+            'nominating_member_name' => sanitize_text_field(wp_unslash((string) ($_POST['nominating_member_name'] ?? ''))),
+            'signature_text' => sanitize_text_field(wp_unslash((string) ($_POST['signature_text'] ?? ''))),
             'application_notes' => sanitize_textarea_field(wp_unslash((string) ($_POST['application_notes'] ?? ''))),
         ];
 
@@ -289,6 +341,27 @@ class ApplicationShortcodeController
             $errors[] = __('Last name is required.', 'iei-membership');
         }
 
+        if ((string) ($input['address_line_1'] ?? '') === '') {
+            $errors[] = __('Address Line 1 is required.', 'iei-membership');
+        }
+
+        if ((string) ($input['suburb'] ?? '') === '') {
+            $errors[] = __('Suburb is required.', 'iei-membership');
+        }
+
+        $state = (string) ($input['state'] ?? '');
+        if (! isset($this->australian_states()[$state])) {
+            $errors[] = __('Please select a valid Australian state.', 'iei-membership');
+        }
+
+        if ((string) ($input['postcode'] ?? '') === '') {
+            $errors[] = __('Postcode is required.', 'iei-membership');
+        }
+
+        if ((string) ($input['phone'] ?? '') === '' && (string) ($input['mobile'] ?? '') === '') {
+            $errors[] = __('Please provide at least a phone or mobile number.', 'iei-membership');
+        }
+
         if (! is_email((string) ($input['email'] ?? ''))) {
             $errors[] = __('A valid email address is required.', 'iei-membership');
         }
@@ -301,6 +374,19 @@ class ApplicationShortcodeController
         $nominationStatus = (string) ($input['nomination_status'] ?? '');
         if (! isset($this->nomination_statuses()[$nominationStatus])) {
             $errors[] = __('Please select a valid nomination status.', 'iei-membership');
+        }
+
+        if ($nominationStatus === 'nominated_by_member') {
+            if ((string) ($input['nominating_member_number'] ?? '') === '') {
+                $errors[] = __('Nominating member number is required when nominated by a member.', 'iei-membership');
+            }
+            if ((string) ($input['nominating_member_name'] ?? '') === '') {
+                $errors[] = __('Nominating member name is required when nominated by a member.', 'iei-membership');
+            }
+        }
+
+        if ((string) ($input['signature_text'] ?? '') === '') {
+            $errors[] = __('Signature is required.', 'iei-membership');
         }
 
         return $errors;
@@ -385,10 +471,21 @@ class ApplicationShortcodeController
                 'public_token' => wp_generate_uuid4(),
                 'applicant_email' => sanitize_email((string) $input['email']),
                 'applicant_first_name' => sanitize_text_field((string) $input['first_name']),
+                'applicant_middle_name' => sanitize_text_field((string) ($input['middle_name'] ?? '')),
                 'applicant_last_name' => sanitize_text_field((string) $input['last_name']),
+                'address_line_1' => sanitize_text_field((string) ($input['address_line_1'] ?? '')),
+                'address_line_2' => sanitize_text_field((string) ($input['address_line_2'] ?? '')),
+                'suburb' => sanitize_text_field((string) ($input['suburb'] ?? '')),
+                'state' => sanitize_key((string) ($input['state'] ?? '')),
+                'postcode' => sanitize_text_field((string) ($input['postcode'] ?? '')),
+                'phone' => sanitize_text_field((string) ($input['phone'] ?? '')),
+                'mobile' => sanitize_text_field((string) ($input['mobile'] ?? '')),
                 'employer' => sanitize_text_field((string) ($input['employer'] ?? '')),
                 'job_position' => sanitize_text_field((string) ($input['job_position'] ?? '')),
-                'nomination_status' => sanitize_key((string) ($input['nomination_status'] ?? 'not_specified')),
+                'nomination_status' => sanitize_key((string) ($input['nomination_status'] ?? 'self_nominated')),
+                'nominating_member_number' => sanitize_text_field((string) ($input['nominating_member_number'] ?? '')),
+                'nominating_member_name' => sanitize_text_field((string) ($input['nominating_member_name'] ?? '')),
+                'signature_text' => sanitize_text_field((string) ($input['signature_text'] ?? '')),
                 'membership_type' => sanitize_key((string) $input['membership_type']),
                 'status' => 'pending_preapproval',
                 'submitted_at' => $now,
@@ -396,6 +493,16 @@ class ApplicationShortcodeController
                 'updated_at' => $now,
             ],
             [
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
                 '%s',
                 '%s',
                 '%s',
@@ -538,9 +645,22 @@ class ApplicationShortcodeController
     private function nomination_statuses(): array
     {
         return [
-            'not_specified' => __('Not specified', 'iei-membership'),
             'self_nominated' => __('Self nominated', 'iei-membership'),
             'nominated_by_member' => __('Nominated by member', 'iei-membership'),
+        ];
+    }
+
+    private function australian_states(): array
+    {
+        return [
+            'ACT' => __('ACT', 'iei-membership'),
+            'NSW' => __('NSW', 'iei-membership'),
+            'NT' => __('NT', 'iei-membership'),
+            'QLD' => __('QLD', 'iei-membership'),
+            'SA' => __('SA', 'iei-membership'),
+            'TAS' => __('TAS', 'iei-membership'),
+            'VIC' => __('VIC', 'iei-membership'),
+            'WA' => __('WA', 'iei-membership'),
         ];
     }
 

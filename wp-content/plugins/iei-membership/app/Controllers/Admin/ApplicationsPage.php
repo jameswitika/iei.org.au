@@ -205,7 +205,7 @@ class ApplicationsPage
         echo '<h1>' . esc_html__('Applications', 'iei-membership') . '</h1>';
 
         $this->render_notice();
-        $this->render_filter_links($status, $counts);
+        $this->render_status_filter($status, $counts);
         $this->render_search_form($status, $search);
 
         echo '<table class="widefat fixed striped">';
@@ -231,7 +231,7 @@ class ApplicationsPage
                 echo '<td>' . esc_html($name) . '</td>';
                 echo '<td>' . esc_html((string) $application['applicant_email']) . '</td>';
                 echo '<td>' . esc_html(ucfirst((string) $application['membership_type'])) . '</td>';
-                echo '<td>' . esc_html((string) $application['status']) . '</td>';
+                echo '<td>' . $this->render_application_status_chip((string) $application['status']) . '</td>';
                 echo '<td>' . esc_html((string) $application['submitted_at']) . '</td>';
                 echo '<td><a class="button button-small" href="' . esc_url($detailUrl) . '">' . esc_html__('View', 'iei-membership') . '</a></td>';
                 echo '</tr>';
@@ -262,9 +262,21 @@ class ApplicationsPage
 
         echo '<table class="form-table" role="presentation"><tbody>';
         $this->render_detail_row(__('First Name', 'iei-membership'), (string) $application['applicant_first_name']);
+        $this->render_detail_row(__('Middle Name', 'iei-membership'), (string) ($application['applicant_middle_name'] ?? ''));
         $this->render_detail_row(__('Last Name', 'iei-membership'), (string) $application['applicant_last_name']);
         $this->render_detail_row(__('Email', 'iei-membership'), (string) $application['applicant_email']);
+        $this->render_detail_row(__('Address Line 1', 'iei-membership'), (string) ($application['address_line_1'] ?? ''));
+        $this->render_detail_row(__('Address Line 2', 'iei-membership'), (string) ($application['address_line_2'] ?? ''));
+        $this->render_detail_row(__('Suburb', 'iei-membership'), (string) ($application['suburb'] ?? ''));
+        $this->render_detail_row(__('State', 'iei-membership'), (string) ($application['state'] ?? ''));
+        $this->render_detail_row(__('Postcode', 'iei-membership'), (string) ($application['postcode'] ?? ''));
+        $this->render_detail_row(__('Phone', 'iei-membership'), (string) ($application['phone'] ?? ''));
+        $this->render_detail_row(__('Mobile', 'iei-membership'), (string) ($application['mobile'] ?? ''));
         $this->render_detail_row(__('Membership Type', 'iei-membership'), ucfirst((string) $application['membership_type']));
+        $this->render_detail_row(__('Nomination Status', 'iei-membership'), (string) ($application['nomination_status'] ?? ''));
+        $this->render_detail_row(__('Nominating Member Number', 'iei-membership'), (string) ($application['nominating_member_number'] ?? ''));
+        $this->render_detail_row(__('Nominating Member Name', 'iei-membership'), (string) ($application['nominating_member_name'] ?? ''));
+        $this->render_detail_row(__('Signature', 'iei-membership'), (string) ($application['signature_text'] ?? ''));
         $this->render_detail_row(__('Status', 'iei-membership'), (string) $application['status']);
         $this->render_detail_row(__('Submitted At', 'iei-membership'), (string) $application['submitted_at']);
         $this->render_detail_row(__('Public Token', 'iei-membership'), (string) $application['public_token']);
@@ -672,28 +684,30 @@ class ApplicationsPage
         return $counts;
     }
 
-    private function render_filter_links(string $activeStatus, array $counts): void
+    private function render_status_filter(string $activeStatus, array $counts): void
     {
-        echo '<ul class="subsubsub">';
+        echo '<form method="get" style="margin:12px 0 10px;">';
+        echo '<input type="hidden" name="page" value="' . esc_attr($this->menuSlug) . '" />';
+
+        echo '<label for="iei_application_status_filter" style="margin-right:8px; font-weight:600;">' . esc_html__('Status', 'iei-membership') . '</label>';
+        echo '<select id="iei_application_status_filter" name="status">';
 
         $allCount = array_sum($counts);
-        $allClass = $activeStatus === '' ? ' class="current"' : '';
-        echo '<li><a' . $allClass . ' href="' . esc_url($this->list_url()) . '">' . esc_html__('All', 'iei-membership') . ' <span class="count">(' . esc_html((string) $allCount) . ')</span></a> | </li>';
+        echo '<option value="" ' . selected($activeStatus, '', false) . '>'
+            . esc_html(sprintf(__('All Statuses (%d)', 'iei-membership'), $allCount))
+            . '</option>';
 
-        $statuses = $this->statuses();
-        $lastKey = array_key_last($statuses);
-        foreach ($statuses as $status) {
-            $class = $activeStatus === $status ? ' class="current"' : '';
-            $url = add_query_arg(['status' => $status], $this->list_url());
+        foreach ($this->statuses() as $status) {
             $count = $counts[$status] ?? 0;
-            echo '<li><a' . $class . ' href="' . esc_url($url) . '">' . esc_html($status) . ' <span class="count">(' . esc_html((string) $count) . ')</span></a>';
-            if ($status !== $lastKey) {
-                echo ' | ';
-            }
-            echo '</li>';
+            $label = $this->status_label($status);
+            echo '<option value="' . esc_attr($status) . '" ' . selected($activeStatus, $status, false) . '>'
+                . esc_html(sprintf('%s (%d)', $label, $count))
+                . '</option>';
         }
 
-        echo '</ul>';
+        echo '</select> ';
+        echo '<button type="submit" class="button">' . esc_html__('Apply', 'iei-membership') . '</button>';
+        echo '</form>';
     }
 
     private function render_search_form(string $status, string $search): void
@@ -706,6 +720,21 @@ class ApplicationsPage
         echo '<input type="search" name="s" value="' . esc_attr($search) . '" placeholder="' . esc_attr__('Search applicant/email/token', 'iei-membership') . '" /> ';
         echo '<button type="submit" class="button">' . esc_html__('Search', 'iei-membership') . '</button>';
         echo '</form>';
+    }
+
+    private function status_label(string $status): string
+    {
+        $labels = [
+            'pending_preapproval' => __('Pending Pre-Approval', 'iei-membership'),
+            'rejected_preapproval' => __('Rejected (Pre-Approval)', 'iei-membership'),
+            'pending_board_approval' => __('Pending Board Approval', 'iei-membership'),
+            'approved' => __('Approved', 'iei-membership'),
+            'rejected_board' => __('Rejected (Board)', 'iei-membership'),
+            'payment_pending' => __('Payment Pending', 'iei-membership'),
+            'paid_active' => __('Paid Active', 'iei-membership'),
+        ];
+
+        return $labels[$status] ?? $status;
     }
 
     private function render_notice(): void
@@ -833,6 +862,49 @@ class ApplicationsPage
             ];
 
             $meta = $styles[$vote] ?? $styles['unanswered'];
+
+            return '<span style="' . esc_attr($meta['style']) . '">' . esc_html((string) $meta['label']) . '</span>';
+        }
+
+        private function render_application_status_chip(string $status): string
+        {
+            $status = sanitize_key($status);
+
+            $styles = [
+                'pending_preapproval' => [
+                    'label' => __('pending_preapproval', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#ffedd5;color:#9a3412;font-weight:600;text-transform:capitalize;',
+                ],
+                'pending_board_approval' => [
+                    'label' => __('pending_board_approval', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#dbeafe;color:#1e3a8a;font-weight:600;text-transform:capitalize;',
+                ],
+                'approved' => [
+                    'label' => __('approved', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#dcfce7;color:#166534;font-weight:600;text-transform:capitalize;',
+                ],
+                'paid_active' => [
+                    'label' => __('paid_active', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#dcfce7;color:#166534;font-weight:600;text-transform:capitalize;',
+                ],
+                'payment_pending' => [
+                    'label' => __('payment_pending', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#ffedd5;color:#9a3412;font-weight:600;text-transform:capitalize;',
+                ],
+                'rejected_preapproval' => [
+                    'label' => __('rejected_preapproval', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#fee2e2;color:#991b1b;font-weight:600;text-transform:capitalize;',
+                ],
+                'rejected_board' => [
+                    'label' => __('rejected_board', 'iei-membership'),
+                    'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#fee2e2;color:#991b1b;font-weight:600;text-transform:capitalize;',
+                ],
+            ];
+
+            $meta = $styles[$status] ?? [
+                'label' => $status !== '' ? $status : __('unknown', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#e5e7eb;color:#374151;font-weight:600;text-transform:capitalize;',
+            ];
 
             return '<span style="' . esc_attr($meta['style']) . '">' . esc_html((string) $meta['label']) . '</span>';
         }

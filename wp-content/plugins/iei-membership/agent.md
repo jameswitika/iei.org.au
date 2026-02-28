@@ -4,15 +4,17 @@
 Implemented:
 - Public application form shortcode with validation, attachment handling, notification to pre-approval officer.
 - Post-submit application redirect to configurable Thank You page and thank-you template rendering.
+- Expanded public application form fields and responsive layout (name/contact/address/signature/declaration + nomination conditional fields).
 - Pre-approval and board workflow with director assignment, voting, reminder/reset actions, threshold auto-finalisation.
 - Approval pipeline: WP user provisioning, pending-payment role, member row/subscription row creation, approval emails.
 - Protected file storage + permission-gated stream endpoint (admin/pre-approval/assigned director).
 - Director dashboard shortcode with list/detail, file preview/download, and voting.
 - Payment admin queue and manual mark-paid activation flow.
+- Payments admin list extended with default outstanding view, completed/all filters, search, status chips, and link to member detail.
 - Payment activation email with welcome messaging and member-home/login link.
 - Daily maintenance cron for overdue/lapsed transitions and role downgrade.
 - CSV import for active members.
-- Members admin list + detail view with latest subscription snapshot and recent activity timeline.
+- Members admin list + detail view with latest subscription snapshot, payment history, and recent activity timeline.
 - Configurable login redirects for directors, pending-payment users, and active/current members.
 - Configurable next membership number counter with safe auto-increment.
 
@@ -102,6 +104,13 @@ Minimum tables:
 - `iei_activity_log`
 
 All CRUD must use prepared SQL statements. Add indexes and unique constraints per spec.
+
+Current `iei_applications` fields additionally include:
+- `applicant_middle_name`
+- `address_line_1`, `address_line_2`, `suburb`, `state`, `postcode`
+- `phone`, `mobile`
+- `nominating_member_number`, `nominating_member_name`
+- `signature_text`
 
 ## Status Enums
 Applications:
@@ -231,3 +240,16 @@ agent.md
    - Director users with vote cap -> configured director dashboard page.
    - Pending-payment users -> configured member payment portal page.
    - Active/current members -> configured member home page (fallback `/member-portal/`).
+
+## UX Notes (Current)
+- Applications admin list:
+   - Status filter uses a select list (clean labels + counts in option text).
+   - Status column uses colored chips.
+- Application detail:
+   - Director vote statuses render as chips (`approved`, `rejected`, `unanswered`).
+- Director dashboard voting:
+   - Directors cannot change a submitted vote unless admin/stuart resets it.
+- Payments admin list:
+   - Default view is outstanding statuses (`pending_payment`, `overdue`, `lapsed`).
+   - `completed` and `all` views are available via filter.
+   - Statuses are rendered as chips.

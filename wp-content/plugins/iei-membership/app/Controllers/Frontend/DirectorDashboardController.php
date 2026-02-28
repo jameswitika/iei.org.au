@@ -125,9 +125,15 @@ class DirectorDashboardController
         echo '<table class="form-table" role="presentation"><tbody>';
         $this->render_detail_row(__('Name', 'iei-membership'), trim((string) $application['applicant_first_name'] . ' ' . (string) $application['applicant_last_name']));
         $this->render_detail_row(__('Email', 'iei-membership'), (string) $application['applicant_email']);
+        $this->render_detail_row(__('Address', 'iei-membership'), (string) (($application['address_line_1'] ?? '') . ' ' . ($application['address_line_2'] ?? '')));
+        $this->render_detail_row(__('Suburb / State / Postcode', 'iei-membership'), trim((string) ($application['suburb'] ?? '') . ' / ' . (string) ($application['state'] ?? '') . ' / ' . (string) ($application['postcode'] ?? '')));
+        $this->render_detail_row(__('Phone', 'iei-membership'), (string) ($application['phone'] ?? '-'));
+        $this->render_detail_row(__('Mobile', 'iei-membership'), (string) ($application['mobile'] ?? '-'));
         $this->render_detail_row(__('Employer', 'iei-membership'), (string) ($application['employer'] ?: '-'));
         $this->render_detail_row(__('Job Position', 'iei-membership'), (string) ($application['job_position'] ?: '-'));
         $this->render_detail_row(__('Nomination Status', 'iei-membership'), (string) ($application['nomination_status'] ?: '-'));
+        $this->render_detail_row(__('Nominating Member Number', 'iei-membership'), (string) (($application['nominating_member_number'] ?? '') ?: '-'));
+        $this->render_detail_row(__('Nominating Member Name', 'iei-membership'), (string) (($application['nominating_member_name'] ?? '') ?: '-'));
         $this->render_detail_row(__('Membership Type', 'iei-membership'), (string) $application['membership_type']);
         $this->render_detail_row(__('Current Vote', 'iei-membership'), (string) $application['vote']);
         $this->render_detail_row(__('First Viewed At', 'iei-membership'), (string) ($application['viewed_at'] ?: '-'));

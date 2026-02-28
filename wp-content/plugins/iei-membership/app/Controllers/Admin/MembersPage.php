@@ -114,6 +114,7 @@ class MembersPage
         }
 
         $latestSubscription = $this->latest_subscription($memberId);
+        $payments = $this->payment_history($memberId);
         $activities = $this->member_activities($memberId, isset($row['application_id']) ? (int) $row['application_id'] : 0);
 
         echo '<div class="wrap">';
@@ -146,6 +147,48 @@ class MembersPage
             $this->detail_row(__('Due Date', 'iei-membership'), (string) ($latestSubscription['due_date'] ?? '-'));
             $this->detail_row(__('Paid At', 'iei-membership'), (string) ($latestSubscription['paid_at'] ?? '-'));
             $this->detail_row(__('Grace Until', 'iei-membership'), (string) ($latestSubscription['grace_until'] ?? '-'));
+            echo '</tbody></table>';
+        }
+
+        echo '<h2>' . esc_html__('Payment History', 'iei-membership') . '</h2>';
+        if (empty($payments)) {
+            echo '<p>' . esc_html__('No payment records found for this member.', 'iei-membership') . '</p>';
+        } else {
+            echo '<table class="widefat fixed striped">';
+            echo '<thead><tr>';
+            echo '<th>' . esc_html__('Payment ID', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Subscription', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Year', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Amount', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Method', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Status', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Reference', 'iei-membership') . '</th>';
+            echo '<th>' . esc_html__('Received At', 'iei-membership') . '</th>';
+            echo '</tr></thead><tbody>';
+
+            foreach ($payments as $payment) {
+                $paymentId = (int) ($payment['id'] ?? 0);
+                $subscriptionId = (int) ($payment['subscription_id'] ?? 0);
+                $membershipYear = (string) (($payment['membership_year'] ?? '') ?: '-');
+                $amount = (float) ($payment['amount'] ?? 0);
+                $currency = (string) (($payment['currency'] ?? '') ?: 'AUD');
+                $method = (string) (($payment['payment_method'] ?? '') ?: '-');
+                $status = (string) (($payment['status'] ?? '') ?: 'pending');
+                $reference = (string) (($payment['reference'] ?? '') ?: '-');
+                $receivedAt = (string) (($payment['received_at'] ?? '') ?: '-');
+
+                echo '<tr>';
+                echo '<td>#' . esc_html((string) $paymentId) . '</td>';
+                echo '<td>' . esc_html($subscriptionId > 0 ? ('#' . $subscriptionId) : '-') . '</td>';
+                echo '<td>' . esc_html($membershipYear) . '</td>';
+                echo '<td>' . esc_html($currency) . ' ' . esc_html(number_format($amount, 2)) . '</td>';
+                echo '<td>' . esc_html($method) . '</td>';
+                echo '<td>' . $this->render_payment_status_chip($status) . '</td>';
+                echo '<td>' . esc_html($reference) . '</td>';
+                echo '<td>' . esc_html($receivedAt) . '</td>';
+                echo '</tr>';
+            }
+
             echo '</tbody></table>';
         }
 
@@ -288,6 +331,58 @@ class MembersPage
         );
 
         return is_array($row) ? $row : null;
+    }
+
+    private function payment_history(int $memberId): array
+    {
+        global $wpdb;
+
+        $paymentsTable = $wpdb->prefix . 'iei_payments';
+        $subscriptionsTable = $wpdb->prefix . 'iei_subscriptions';
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT p.id, p.subscription_id, p.amount, p.currency, p.payment_method, p.status,
+                        p.reference, p.received_at, p.created_at,
+                        s.membership_year
+                 FROM {$paymentsTable} p
+                 LEFT JOIN {$subscriptionsTable} s ON s.id = p.subscription_id
+                 WHERE p.member_id = %d
+                 ORDER BY COALESCE(p.received_at, p.created_at) DESC, p.id DESC
+                 LIMIT 200",
+                $memberId
+            ),
+            ARRAY_A
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    private function render_payment_status_chip(string $status): string
+    {
+        $status = sanitize_key($status);
+
+        $styles = [
+            'paid' => [
+                'label' => __('paid', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#dcfce7;color:#166534;font-weight:600;text-transform:capitalize;',
+            ],
+            'pending' => [
+                'label' => __('pending', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#ffedd5;color:#9a3412;font-weight:600;text-transform:capitalize;',
+            ],
+            'failed' => [
+                'label' => __('failed', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#fee2e2;color:#991b1b;font-weight:600;text-transform:capitalize;',
+            ],
+        ];
+
+        $meta = $styles[$status] ?? [
+            'label' => $status !== '' ? $status : __('unknown', 'iei-membership'),
+            'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#e5e7eb;color:#374151;font-weight:600;text-transform:capitalize;',
+        ];
+
+        return '<span style="' . esc_attr($meta['style']) . '">' . esc_html((string) $meta['label']) . '</span>';
     }
 
     private function member_activities(int $memberId, int $applicationId): array
