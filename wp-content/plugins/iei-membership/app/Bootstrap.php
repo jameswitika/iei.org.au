@@ -4,6 +4,7 @@ namespace IEI\Membership;
 
 use IEI\Membership\Controllers\Admin\SettingsPage;
 use IEI\Membership\Controllers\Admin\ApplicationsPage;
+use IEI\Membership\Controllers\Admin\DashboardPage;
 use IEI\Membership\Controllers\Admin\DirectorsPage;
 use IEI\Membership\Controllers\Admin\ImportMembersPage;
 use IEI\Membership\Controllers\Admin\MembersPage;
@@ -16,8 +17,10 @@ use IEI\Membership\Services\ActivityLogger;
 use IEI\Membership\Services\BoardDecisionService;
 use IEI\Membership\Services\DailyMaintenanceService;
 use IEI\Membership\Services\FileStorageService;
+use IEI\Membership\Services\PayPalGatewayService;
 use IEI\Membership\Services\PaymentActivationService;
 use IEI\Membership\Services\RolesManager;
+use IEI\Membership\Services\StripeGatewayService;
 
 /**
  * Plugin runtime bootstrap: wires services, controllers, menus, and hooks.
@@ -30,6 +33,7 @@ class Bootstrap
     private ?DirectorDashboardController $directorDashboardController = null;
     private ?MemberPaymentPortalController $memberPaymentPortalController = null;
     private ?ApplicationsPage $applicationsPage = null;
+    private ?DashboardPage $dashboardPage = null;
     private ?DirectorsPage $directorsPage = null;
     private ?MembersPage $membersPage = null;
     private ?PaymentsPage $paymentsPage = null;
@@ -79,6 +83,7 @@ class Bootstrap
         $this->fileController->register_hooks();
         $this->applicationsPage = new ApplicationsPage(new FileStorageService(), new ActivityLogger());
         $this->applicationsPage->register_hooks();
+        $this->dashboardPage = new DashboardPage();
         $this->directorsPage = new DirectorsPage();
         $this->directorsPage->register_hooks();
         $this->membersPage = new MembersPage();
@@ -98,7 +103,12 @@ class Bootstrap
             new BoardDecisionService(new ActivityLogger())
         );
         $this->directorDashboardController->register_hooks();
-        $this->memberPaymentPortalController = new MemberPaymentPortalController();
+        $this->memberPaymentPortalController = new MemberPaymentPortalController(
+            new PaymentActivationService(new ActivityLogger()),
+            new StripeGatewayService(),
+            new PayPalGatewayService(),
+            new ActivityLogger()
+        );
         $this->memberPaymentPortalController->register_hooks();
 
         add_action('admin_menu', [$this, 'register_admin_menu']);
@@ -122,6 +132,12 @@ class Bootstrap
         );
 
         $submenus = [
+            'dashboard' => [
+                'title' => __('Dashboard', 'iei-membership'),
+                'capability' => RolesManager::CAP_MANAGE_MEMBERSHIP,
+                'slug' => $menuSlug,
+                'callback' => [$this, 'render_membership_dashboard'],
+            ],
             'applications' => [
                 'title' => __('Applications', 'iei-membership'),
                 'capability' => RolesManager::CAP_MANAGE_APPLICATIONS,
@@ -170,7 +186,7 @@ class Bootstrap
                 $menuConfig['title'],
                 $menuConfig['title'],
                 $menuConfig['capability'],
-                $menuSlug . '-' . $slug,
+                isset($menuConfig['slug']) ? (string) $menuConfig['slug'] : $menuSlug . '-' . $slug,
                 $menuConfig['callback']
             );
         }
@@ -179,7 +195,13 @@ class Bootstrap
     public function render_membership_dashboard(): void
     {
         $this->assert_capability(RolesManager::CAP_MANAGE_MEMBERSHIP);
-        $this->render_scaffold_page(__('IEI Membership', 'iei-membership'));
+
+        if ($this->dashboardPage) {
+            $this->dashboardPage->render();
+            return;
+        }
+
+        $this->render_scaffold_page(__('IEI Membership Dashboard', 'iei-membership'));
     }
 
     public function render_placeholder_page(): void

@@ -141,19 +141,27 @@ class BoardDecisionService
             'status' => 'rejected_board',
         ], $actorUserId);
 
-        $sendRejectionEmail = (bool) apply_filters('iei_membership_send_rejection_email', false, $application);
-        $sent = false;
-
-        if ($sendRejectionEmail && is_email((string) $application['applicant_email'])) {
-            $subject = __('IEI Membership Application Outcome', 'iei-membership');
-            $body = "Your membership application has been reviewed by the board and was not approved at this time.\n";
-            $sent = (bool) wp_mail((string) $application['applicant_email'], $subject, $body);
-        }
+        $sent = $this->send_board_rejection_email($application);
 
         $this->activityLogger->log_application_event($applicationId, 'board_rejection_email_processed', [
-            'enabled' => $sendRejectionEmail,
             'sent' => $sent,
         ], $actorUserId);
+    }
+
+    private function send_board_rejection_email(array $application): bool
+    {
+        $email = sanitize_email((string) ($application['applicant_email'] ?? ''));
+        if (! is_email($email)) {
+            return false;
+        }
+
+        $subject = __('Update on Your Membership Application', 'iei-membership');
+        $body = "Thank you for your application.\n\n"
+            . "After review by the board, we are unable to progress your application to the next stage at this time.\n\n"
+            . "If you believe additional information may assist your application, please contact us.\n\n"
+            . "We appreciate your interest.";
+
+        return (bool) wp_mail($email, $subject, $body);
     }
 
     private function ensure_applicant_wp_user(array $application): int

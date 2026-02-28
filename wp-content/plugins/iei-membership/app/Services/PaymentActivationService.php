@@ -17,7 +17,7 @@ class PaymentActivationService
     /**
      * Mark a subscription as paid and transition the member to active state.
      */
-    public function mark_subscription_paid(int $subscriptionId, ?int $actorUserId = null, string $reference = ''): array
+    public function mark_subscription_paid(int $subscriptionId, ?int $actorUserId = null, string $reference = '', array $paymentMeta = []): array
     {
         global $wpdb;
 
@@ -39,28 +39,45 @@ class PaymentActivationService
 
         $alreadyPaid = (string) ($subscription['status'] ?? '') === 'active';
 
-        if (! $alreadyPaid) {
-            $updated = $wpdb->update(
-                $wpdb->prefix . 'iei_subscriptions',
-                [
-                    'status' => 'active',
-                    'amount_paid' => $amountDue,
-                    'paid_at' => $now,
-                    'start_date' => $cycleDates['start_date'],
-                    'end_date' => $cycleDates['end_date'],
-                    'updated_at' => $now,
-                ],
-                ['id' => $subscriptionId],
-                ['%s', '%f', '%s', '%s', '%s', '%s'],
-                ['%d']
-            );
+        if ($alreadyPaid) {
+            $paymentId = $this->insert_payment_record($member, $subscription, $amountDue, $reference, $now, $paymentMeta);
+            $membershipNumber = $this->ensure_membership_number($member);
 
-            if ($updated === false) {
-                throw new \RuntimeException('Failed to update subscription status.');
-            }
+            $this->activityLogger->log_member_event($memberId, 'payment_duplicate_ignored', [
+                'subscription_id' => $subscriptionId,
+                'payment_id' => $paymentId,
+                'gateway' => (string) ($paymentMeta['gateway'] ?? 'bank_transfer'),
+            ], $actorUserId, $applicationId);
+
+            return [
+                'payment_id' => $paymentId,
+                'member_id' => $memberId,
+                'membership_number' => $membershipNumber,
+                'email_sent' => false,
+                'already_paid' => true,
+            ];
         }
 
-        $paymentId = $this->insert_payment_record($member, $subscription, $amountDue, $reference, $now);
+        $updated = $wpdb->update(
+            $wpdb->prefix . 'iei_subscriptions',
+            [
+                'status' => 'active',
+                'amount_paid' => $amountDue,
+                'paid_at' => $now,
+                'start_date' => $cycleDates['start_date'],
+                'end_date' => $cycleDates['end_date'],
+                'updated_at' => $now,
+            ],
+            ['id' => $subscriptionId],
+            ['%s', '%f', '%s', '%s', '%s', '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            throw new \RuntimeException('Failed to update subscription status.');
+        }
+
+        $paymentId = $this->insert_payment_record($member, $subscription, $amountDue, $reference, $now, $paymentMeta);
 
         $membershipNumber = $this->ensure_membership_number($member);
         $this->activate_member($member, $membershipNumber, $now);
@@ -75,10 +92,22 @@ class PaymentActivationService
             'reference_provided' => $reference !== '',
         ], $actorUserId, $applicationId);
 
+        $this->activityLogger->log_member_event($memberId, 'payment_recorded', [
+            'subscription_id' => $subscriptionId,
+            'payment_id' => $paymentId,
+            'gateway' => (string) ($paymentMeta['gateway'] ?? 'bank_transfer'),
+            'gateway_reference' => (string) ($paymentMeta['gateway_transaction_id'] ?? ''),
+        ], $actorUserId, $applicationId);
+
         $this->activityLogger->log_member_event($memberId, 'member_activated_after_payment', [
             'membership_number' => $membershipNumber,
             'subscription_id' => $subscriptionId,
             'email_sent' => $emailSent,
+        ], $actorUserId, $applicationId);
+
+        $this->activityLogger->log_member_event($memberId, 'membership_activated', [
+            'membership_number' => $membershipNumber,
+            'subscription_id' => $subscriptionId,
         ], $actorUserId, $applicationId);
 
         return [
@@ -89,11 +118,37 @@ class PaymentActivationService
         ];
     }
 
-    private function insert_payment_record(array $member, array $subscription, float $amount, string $reference, string $now): int
+    private function insert_payment_record(array $member, array $subscription, float $amount, string $reference, string $now, array $paymentMeta = []): int
     {
         global $wpdb;
 
         $paymentsTable = $wpdb->prefix . 'iei_payments';
+        $gatewayReference = sanitize_text_field((string) ($paymentMeta['gateway_transaction_id'] ?? ''));
+        $paymentMethod = sanitize_key((string) ($paymentMeta['payment_method'] ?? 'bank_transfer'));
+        if ($paymentMethod === '') {
+            $paymentMethod = 'bank_transfer';
+        }
+        $gateway = sanitize_key((string) ($paymentMeta['gateway'] ?? $paymentMethod));
+        if ($gateway === '') {
+            $gateway = $paymentMethod;
+        }
+        $currency = strtoupper(sanitize_text_field((string) ($paymentMeta['currency'] ?? 'AUD')));
+        if ($currency === '') {
+            $currency = 'AUD';
+        }
+
+        if ($gatewayReference !== '') {
+            $existingByReference = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT id FROM {$paymentsTable} WHERE gateway_transaction_id = %s LIMIT 1",
+                    $gatewayReference
+                )
+            );
+
+            if ($existingByReference) {
+                return (int) $existingByReference;
+            }
+        }
 
         $existing = $wpdb->get_var(
             $wpdb->prepare(
@@ -114,10 +169,10 @@ class PaymentActivationService
                 'subscription_id' => (int) $subscription['id'],
                 'application_id' => isset($member['application_id']) ? (int) $member['application_id'] : null,
                 'amount' => $amount,
-                'currency' => 'AUD',
-                'payment_method' => 'bank_transfer',
-                'gateway' => null,
-                'gateway_transaction_id' => null,
+                'currency' => $currency,
+                'payment_method' => $paymentMethod,
+                'gateway' => $gateway,
+                'gateway_transaction_id' => $gatewayReference !== '' ? $gatewayReference : null,
                 'status' => 'paid',
                 'reference' => sanitize_text_field($reference),
                 'received_at' => $now,

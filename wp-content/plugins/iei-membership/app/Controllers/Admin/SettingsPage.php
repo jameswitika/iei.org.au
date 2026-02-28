@@ -70,6 +70,15 @@ class SettingsPage
             $this->slug
         );
 
+        add_settings_section(
+            'iei_membership_payments',
+            __('Payments', 'iei-membership'),
+            static function (): void {
+                echo '<p>' . esc_html__('Configure Stripe Checkout, PayPal Smart Buttons, and bank transfer options.', 'iei-membership') . '</p>';
+            },
+            $this->slug
+        );
+
         $fields = [
             'approval_threshold' => ['Approval threshold', 'number'],
             'rejection_threshold' => ['Rejection threshold', 'number'],
@@ -85,8 +94,6 @@ class SettingsPage
             'price_senior' => ['Price: Senior', 'text'],
             'protected_storage_dir' => ['Protected storage directory', 'text'],
             'allowed_mime_types' => ['Allowed mime types (comma-separated extensions)', 'text'],
-            'bank_transfer_enabled' => ['Enable bank transfer', 'checkbox'],
-            'bank_transfer_instructions' => ['Bank transfer instructions', 'textarea'],
         ];
 
         foreach ($fields as $key => [$label, $type]) {
@@ -96,6 +103,43 @@ class SettingsPage
                 [$this, 'render_field'],
                 $this->slug,
                 'iei_membership_general',
+                [
+                    'key' => $key,
+                    'type' => $type,
+                ]
+            );
+        }
+
+        $paymentFields = [
+            'payments_mode' => ['Payments mode', 'select'],
+            'payments_currency' => ['Payments currency', 'text'],
+            'payments_methods_enabled' => ['Enabled payment methods', 'checkboxes'],
+            'payment_success_page_id' => ['Payment success page', 'page_select'],
+            'payment_cancel_page_id' => ['Payment cancel page', 'page_select'],
+            'stripe_webhook_url_display' => ['Stripe webhook endpoint', 'webhook_display'],
+            'paypal_webhook_url_display' => ['PayPal webhook endpoint', 'webhook_display'],
+            'stripe_test_secret_key' => ['Stripe test secret key', 'text'],
+            'stripe_test_webhook_signing_secret' => ['Stripe test webhook signing secret', 'text'],
+            'stripe_live_secret_key' => ['Stripe live secret key', 'text'],
+            'stripe_live_webhook_signing_secret' => ['Stripe live webhook signing secret', 'text'],
+            'paypal_sandbox_client_id' => ['PayPal sandbox client ID', 'text'],
+            'paypal_sandbox_client_secret' => ['PayPal sandbox client secret', 'text'],
+            'paypal_sandbox_webhook_id' => ['PayPal sandbox webhook ID', 'text'],
+            'paypal_live_client_id' => ['PayPal live client ID', 'text'],
+            'paypal_live_client_secret' => ['PayPal live client secret', 'text'],
+            'paypal_live_webhook_id' => ['PayPal live webhook ID', 'text'],
+            'paypal_allowed_funding' => ['PayPal allowed funding (comma-separated)', 'text'],
+            'paypal_button_style' => ['PayPal button style JSON', 'textarea'],
+            'bank_transfer_instructions' => ['Bank transfer instructions', 'textarea'],
+        ];
+
+        foreach ($paymentFields as $key => [$label, $type]) {
+            add_settings_field(
+                $key,
+                __($label, 'iei-membership'),
+                [$this, 'render_field'],
+                $this->slug,
+                'iei_membership_payments',
                 [
                     'key' => $key,
                     'type' => $type,
@@ -139,6 +183,49 @@ class SettingsPage
 
         if ($key === 'allowed_mime_types' && is_array($value)) {
             $value = implode(', ', $value);
+        }
+
+        if ($key === 'payments_methods_enabled' && is_array($value)) {
+            $value = array_values(array_unique(array_map('sanitize_key', $value)));
+        }
+
+        if ($key === 'paypal_allowed_funding' && is_array($value)) {
+            $value = implode(', ', $value);
+        }
+
+        if ($type === 'webhook_display') {
+            $hookType = strpos($key, 'stripe_') === 0 ? 'stripe' : 'paypal';
+            $url = $this->webhook_url($hookType);
+            echo '<code>' . esc_html($url) . '</code>';
+            return;
+        }
+
+        if ($type === 'select' && $key === 'payments_mode') {
+            echo '<select name="' . esc_attr($fieldName) . '">';
+            echo '<option value="test" ' . selected((string) $value, 'test', false) . '>' . esc_html__('Test / Sandbox', 'iei-membership') . '</option>';
+            echo '<option value="live" ' . selected((string) $value, 'live', false) . '>' . esc_html__('Live / Production', 'iei-membership') . '</option>';
+            echo '</select>';
+            return;
+        }
+
+        if ($type === 'checkboxes' && $key === 'payments_methods_enabled') {
+            $selectedMethods = is_array($value) ? $value : [];
+            $methods = [
+                'stripe_checkout' => __('Stripe Checkout', 'iei-membership'),
+                'paypal_smart_buttons' => __('PayPal Smart Buttons', 'iei-membership'),
+                'bank_transfer' => __('Bank transfer', 'iei-membership'),
+            ];
+
+            echo '<fieldset>';
+            foreach ($methods as $methodKey => $methodLabel) {
+                $inputId = 'iei_payment_method_' . $methodKey;
+                echo '<label for="' . esc_attr($inputId) . '" style="display:block;margin:4px 0;">';
+                echo '<input type="checkbox" id="' . esc_attr($inputId) . '" name="' . esc_attr($fieldName) . '[]" value="' . esc_attr($methodKey) . '" ' . checked(in_array($methodKey, $selectedMethods, true), true, false) . ' /> ';
+                echo esc_html($methodLabel);
+                echo '</label>';
+            }
+            echo '</fieldset>';
+            return;
         }
 
         if ($type === 'checkbox') {
@@ -215,6 +302,8 @@ class SettingsPage
         $applicationThankYouPageId = absint($input['application_thank_you_page_id'] ?? $defaults['application_thank_you_page_id']);
         $memberPaymentPortalPageId = absint($input['member_payment_portal_page_id'] ?? $defaults['member_payment_portal_page_id']);
         $memberHomePageId = absint($input['member_home_page_id'] ?? $defaults['member_home_page_id']);
+        $paymentSuccessPageId = absint($input['payment_success_page_id'] ?? $defaults['payment_success_page_id']);
+        $paymentCancelPageId = absint($input['payment_cancel_page_id'] ?? $defaults['payment_cancel_page_id']);
         $nextMembershipNumber = max(1, absint($input['next_membership_number'] ?? $defaults['next_membership_number']));
 
         $associatePrice = $this->sanitize_money($input['price_associate'] ?? $defaults['membership_type_prices']['associate']);
@@ -233,7 +322,26 @@ class SettingsPage
             $allowedMimeTypes = $defaults['allowed_mime_types'];
         }
 
-        $bankTransferEnabled = isset($input['bank_transfer_enabled']) ? (bool) $input['bank_transfer_enabled'] : false;
+        $paymentsMode = sanitize_key((string) ($input['payments_mode'] ?? $defaults['payments_mode']));
+        if (! in_array($paymentsMode, ['test', 'live'], true)) {
+            $paymentsMode = 'test';
+        }
+
+        $paymentsCurrency = strtoupper(sanitize_text_field((string) ($input['payments_currency'] ?? $defaults['payments_currency'])));
+        if ($paymentsCurrency === '') {
+            $paymentsCurrency = 'AUD';
+        }
+
+        $paymentMethodsEnabled = $this->normalize_payment_methods($input['payments_methods_enabled'] ?? $defaults['payments_methods_enabled']);
+        $bankTransferEnabled = in_array('bank_transfer', $paymentMethodsEnabled, true);
+
+        $paypalAllowedFundingRaw = (string) ($input['paypal_allowed_funding'] ?? '');
+        $paypalAllowedFunding = array_values(array_unique(array_filter(array_map(static function ($value): string {
+            return sanitize_key(trim((string) $value));
+        }, explode(',', $paypalAllowedFundingRaw)))));
+
+        $paypalButtonStyle = $this->sanitize_paypal_button_style((string) ($input['paypal_button_style'] ?? '{}'));
+
         $bankTransferInstructions = sanitize_textarea_field((string) ($input['bank_transfer_instructions'] ?? ''));
 
         return [
@@ -245,6 +353,8 @@ class SettingsPage
             'application_thank_you_page_id' => $applicationThankYouPageId,
             'member_payment_portal_page_id' => $memberPaymentPortalPageId,
             'member_home_page_id' => $memberHomePageId,
+            'payment_success_page_id' => $paymentSuccessPageId,
+            'payment_cancel_page_id' => $paymentCancelPageId,
             'next_membership_number' => $nextMembershipNumber,
             'membership_type_prices' => [
                 'associate' => $associatePrice,
@@ -253,6 +363,21 @@ class SettingsPage
             ],
             'protected_storage_dir' => $storageDir,
             'allowed_mime_types' => $allowedMimeTypes,
+            'payments_mode' => $paymentsMode,
+            'payments_currency' => $paymentsCurrency,
+            'payments_methods_enabled' => $paymentMethodsEnabled,
+            'stripe_test_secret_key' => sanitize_text_field((string) ($input['stripe_test_secret_key'] ?? '')),
+            'stripe_test_webhook_signing_secret' => sanitize_text_field((string) ($input['stripe_test_webhook_signing_secret'] ?? '')),
+            'stripe_live_secret_key' => sanitize_text_field((string) ($input['stripe_live_secret_key'] ?? '')),
+            'stripe_live_webhook_signing_secret' => sanitize_text_field((string) ($input['stripe_live_webhook_signing_secret'] ?? '')),
+            'paypal_sandbox_client_id' => sanitize_text_field((string) ($input['paypal_sandbox_client_id'] ?? '')),
+            'paypal_sandbox_client_secret' => sanitize_text_field((string) ($input['paypal_sandbox_client_secret'] ?? '')),
+            'paypal_sandbox_webhook_id' => sanitize_text_field((string) ($input['paypal_sandbox_webhook_id'] ?? '')),
+            'paypal_live_client_id' => sanitize_text_field((string) ($input['paypal_live_client_id'] ?? '')),
+            'paypal_live_client_secret' => sanitize_text_field((string) ($input['paypal_live_client_secret'] ?? '')),
+            'paypal_live_webhook_id' => sanitize_text_field((string) ($input['paypal_live_webhook_id'] ?? '')),
+            'paypal_allowed_funding' => $paypalAllowedFunding,
+            'paypal_button_style' => $paypalButtonStyle,
             'bank_transfer_enabled' => $bankTransferEnabled,
             'bank_transfer_instructions' => $bankTransferInstructions,
             'active_gateway' => sanitize_key((string) ($defaults['active_gateway'] ?? 'stripe')),
@@ -276,7 +401,53 @@ class SettingsPage
 
         $saved['membership_type_prices'] = array_merge($defaults['membership_type_prices'], $savedPrices);
 
+        if (! isset($saved['payments_methods_enabled']) || ! is_array($saved['payments_methods_enabled'])) {
+            $saved['payments_methods_enabled'] = $defaults['payments_methods_enabled'];
+        }
+
+        if (! isset($saved['paypal_allowed_funding']) || ! is_array($saved['paypal_allowed_funding'])) {
+            $saved['paypal_allowed_funding'] = $defaults['paypal_allowed_funding'];
+        }
+
         return array_merge($defaults, $saved);
+    }
+
+    private function normalize_payment_methods($value): array
+    {
+        $value = is_array($value) ? $value : [];
+        $allowed = ['stripe_checkout', 'paypal_smart_buttons', 'bank_transfer'];
+
+        $methods = array_values(array_unique(array_filter(array_map(static function ($method): string {
+            return sanitize_key((string) $method);
+        }, $value), static function (string $method) use ($allowed): bool {
+            return in_array($method, $allowed, true);
+        })));
+
+        if (empty($methods)) {
+            return ['bank_transfer'];
+        }
+
+        return $methods;
+    }
+
+    private function sanitize_paypal_button_style(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '{}';
+        }
+
+        $decoded = json_decode($value, true);
+        if (! is_array($decoded)) {
+            return '{}';
+        }
+
+        return (string) wp_json_encode($decoded);
+    }
+
+    private function webhook_url(string $provider): string
+    {
+        return add_query_arg(['iei_webhook' => $provider], home_url('/'));
     }
 
     private function sanitize_money($value): float

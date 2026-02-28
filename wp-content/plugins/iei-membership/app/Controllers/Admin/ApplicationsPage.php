@@ -185,7 +185,7 @@ class ApplicationsPage
                 $this->redirect_to_detail($applicationId, 'preapproved');
             }
 
-            $this->reject_application($applicationId);
+            $this->reject_application($applicationId, $application);
             $this->redirect_to_detail($applicationId, 'rejected');
         } catch (\Throwable $throwable) {
             error_log('[IEI Membership] Application moderation failed: ' . $throwable->getMessage());
@@ -424,7 +424,7 @@ class ApplicationsPage
         ], get_current_user_id());
     }
 
-    private function reject_application(int $applicationId): void
+    private function reject_application(int $applicationId, array $application): void
     {
         global $wpdb;
 
@@ -456,6 +456,27 @@ class ApplicationsPage
         $this->activityLogger->log_application_event($applicationId, 'application_rejected_preapproval', [
             'status' => 'rejected_preapproval',
         ], get_current_user_id());
+
+        $emailSent = $this->send_preapproval_rejection_email($application);
+        $this->activityLogger->log_application_event($applicationId, 'preapproval_rejection_email_processed', [
+            'sent' => $emailSent,
+        ], get_current_user_id());
+    }
+
+    private function send_preapproval_rejection_email(array $application): bool
+    {
+        $email = sanitize_email((string) ($application['applicant_email'] ?? ''));
+        if (! is_email($email)) {
+            return false;
+        }
+
+        $subject = __('Update on Your Membership Application', 'iei-membership');
+        $body = "Thank you for your application.\n\n"
+            . "After an initial review, we are unable to progress your application to the next stage at this time.\n\n"
+            . "If you believe additional information may assist your application, please contact us.\n\n"
+            . "We appreciate your interest.";
+
+        return (bool) wp_mail($email, $subject, $body);
     }
 
     private function create_or_reset_vote_rows(int $applicationId, array $directors): int
