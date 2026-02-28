@@ -55,6 +55,10 @@ function iei_membership_default_settings(): array
         'bank_transfer_enabled' => true,
         'bank_transfer_instructions' => '',
         'active_gateway' => 'stripe',
+        'director_dashboard_page_id' => 0,
+        'member_payment_portal_page_id' => 0,
+        'member_home_page_id' => 0,
+        'next_membership_number' => 1,
     ];
 }
 

@@ -379,10 +379,15 @@ class BoardDecisionService
 
         $stuartEmails = $this->preapproval_officer_emails();
         $stuartSubject = __('Application approved and moved to payment pending', 'iei-membership');
-        $stuartBody = sprintf(
-            "Application #%d approved. Applicant is now pending payment.",
-            (int) $application['id']
+        $applicantName = trim(
+            (string) ($application['applicant_first_name'] ?? '') . ' ' . (string) ($application['applicant_last_name'] ?? '')
         );
+        $applicantCompany = trim((string) ($application['employer'] ?? ''));
+
+        $stuartBody = "Application #" . (int) $application['id'] . " approved. Applicant is now pending payment.\n\n";
+        $stuartBody .= 'Applicant Name: ' . ($applicantName !== '' ? $applicantName : 'Not provided') . "\n";
+        $stuartBody .= 'Company: ' . ($applicantCompany !== '' ? $applicantCompany : 'Not provided') . "\n";
+        $stuartBody .= 'Membership Type: ' . (string) ($application['membership_type'] ?? 'Not provided') . "\n";
 
         $stuartSentCount = 0;
         foreach ($stuartEmails as $email) {

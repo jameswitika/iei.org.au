@@ -70,6 +70,10 @@ class SettingsPage
             'rejection_threshold' => ['Rejection threshold', 'number'],
             'grace_period_days' => ['Grace period (days)', 'number'],
             'prorata_cutoff_days' => ['Pro-rata cutoff (days)', 'number'],
+            'director_dashboard_page_id' => ['Director dashboard page', 'page_select'],
+            'member_payment_portal_page_id' => ['Membership payment portal page', 'page_select'],
+            'member_home_page_id' => ['Member home page', 'page_select'],
+            'next_membership_number' => ['Next membership number', 'number'],
             'price_associate' => ['Price: Associate', 'text'],
             'price_corporate' => ['Price: Corporate', 'text'],
             'price_senior' => ['Price: Senior', 'text'],
@@ -141,6 +145,22 @@ class SettingsPage
             return;
         }
 
+        if ($type === 'page_select') {
+            $pages = get_pages([
+                'sort_column' => 'post_title',
+                'sort_order' => 'ASC',
+            ]);
+
+            echo '<select name="' . esc_attr($fieldName) . '">';
+            echo '<option value="0">' . esc_html__('— Select a page —', 'iei-membership') . '</option>';
+            foreach ($pages as $page) {
+                echo '<option value="' . esc_attr((string) $page->ID) . '" ' . selected((int) $value, (int) $page->ID, false) . '>' . esc_html($page->post_title) . '</option>';
+            }
+            echo '</select>';
+
+            return;
+        }
+
         if ($type === 'textarea') {
             printf(
                 '<textarea class="large-text" rows="6" name="%1$s">%2$s</textarea>',
@@ -179,6 +199,10 @@ class SettingsPage
         $rejectionThreshold = max(1, absint($input['rejection_threshold'] ?? $defaults['rejection_threshold']));
         $gracePeriodDays = max(0, absint($input['grace_period_days'] ?? $defaults['grace_period_days']));
         $prorataCutoffDays = max(0, absint($input['prorata_cutoff_days'] ?? $defaults['prorata_cutoff_days']));
+        $directorDashboardPageId = absint($input['director_dashboard_page_id'] ?? $defaults['director_dashboard_page_id']);
+        $memberPaymentPortalPageId = absint($input['member_payment_portal_page_id'] ?? $defaults['member_payment_portal_page_id']);
+        $memberHomePageId = absint($input['member_home_page_id'] ?? $defaults['member_home_page_id']);
+        $nextMembershipNumber = max(1, absint($input['next_membership_number'] ?? $defaults['next_membership_number']));
 
         $associatePrice = $this->sanitize_money($input['price_associate'] ?? $defaults['membership_type_prices']['associate']);
         $corporatePrice = $this->sanitize_money($input['price_corporate'] ?? $defaults['membership_type_prices']['corporate']);
@@ -204,6 +228,10 @@ class SettingsPage
             'rejection_threshold' => $rejectionThreshold,
             'grace_period_days' => $gracePeriodDays,
             'prorata_cutoff_days' => $prorataCutoffDays,
+            'director_dashboard_page_id' => $directorDashboardPageId,
+            'member_payment_portal_page_id' => $memberPaymentPortalPageId,
+            'member_home_page_id' => $memberHomePageId,
+            'next_membership_number' => $nextMembershipNumber,
             'membership_type_prices' => [
                 'associate' => $associatePrice,
                 'corporate' => $corporatePrice,

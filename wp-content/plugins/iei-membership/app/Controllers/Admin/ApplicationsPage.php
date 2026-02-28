@@ -101,9 +101,11 @@ class ApplicationsPage
         $total = count($nonResponders);
 
         $subject = __('Director vote reminder', 'iei-membership');
+        $reviewUrl = $this->director_review_url($applicationId);
         $body = sprintf(
-            "Reminder: Application #%d is still awaiting your board vote.\nPlease log in and submit your response.",
-            $applicationId
+            "Reminder: Application #%d is still awaiting your board vote.\nPlease log in and submit your response.\n\nReview URL: %s",
+            $applicationId,
+            $reviewUrl
         );
 
         foreach ($nonResponders as $row) {
@@ -489,7 +491,7 @@ class ApplicationsPage
             . "Membership type: {membership_type}\n"
             . "Review URL: {review_url}\n";
 
-        $reviewUrl = $this->detail_url($applicationId);
+        $reviewUrl = $this->director_review_url($applicationId);
         $tokens = [
             '{application_id}' => (string) $applicationId,
             '{first_name}' => (string) ($application['applicant_first_name'] ?? ''),
@@ -812,6 +814,47 @@ class ApplicationsPage
     private function detail_url(int $applicationId): string
     {
         return add_query_arg(['application_id' => $applicationId], $this->list_url());
+    }
+
+    private function director_review_url(int $applicationId): string
+    {
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $configuredPageId = absint($settings['director_dashboard_page_id'] ?? 0);
+
+        if ($configuredPageId > 0) {
+            $configuredUrl = get_permalink($configuredPageId);
+            if (is_string($configuredUrl) && $configuredUrl !== '') {
+                return add_query_arg(['application_id' => $applicationId], $configuredUrl);
+            }
+        }
+
+        global $wpdb;
+
+        $postsTable = $wpdb->posts;
+        $pageId = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT ID
+                 FROM {$postsTable}
+                 WHERE post_type = %s
+                   AND post_status = %s
+                   AND post_content LIKE %s
+                 ORDER BY ID ASC
+                 LIMIT 1",
+                'page',
+                'publish',
+                '%[iei_director_dashboard%'
+            )
+        );
+
+        if (! empty($pageId)) {
+            $permalink = get_permalink((int) $pageId);
+            if (is_string($permalink) && $permalink !== '') {
+                return add_query_arg(['application_id' => $applicationId], $permalink);
+            }
+        }
+
+        return add_query_arg(['application_id' => $applicationId], home_url('/'));
     }
 
     private function redirect_to_detail(int $applicationId, string $updated): void

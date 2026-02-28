@@ -174,13 +174,51 @@ class PaymentActivationService
             return false;
         }
 
+        $displayName = trim((string) $user->display_name);
+        if ($displayName === '') {
+            $displayName = trim((string) $user->user_firstname);
+        }
+        if ($displayName === '') {
+            $displayName = trim((string) $user->user_login);
+        }
+
+        $portalUrl = $this->member_home_or_login_url();
+
         $subject = __('IEI Membership Activated', 'iei-membership');
-        $message = "Your payment has been received and your IEI membership is now active.\n\n";
+        $message = 'Welcome to IEI';
+        if ($displayName !== '') {
+            $message .= ', ' . $displayName;
+        }
+        $message .= "!\n\n";
+        $message .= "Your payment has been received and your IEI membership is now active.\n\n";
         $message .= 'Membership number: ' . $membershipNumber . "\n";
         $message .= 'Amount paid: AUD ' . number_format($amount, 2) . "\n";
         $message .= 'Subscription period: ' . (string) ($subscription['start_date'] ?? '-') . ' to ' . (string) ($subscription['end_date'] ?? '-') . "\n";
+        $message .= "\n";
+        $message .= "Visit your member area: {$portalUrl}\n";
 
         return (bool) wp_mail($user->user_email, $subject, $message);
+    }
+
+    private function member_home_or_login_url(): string
+    {
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $memberHomePageId = absint($settings['member_home_page_id'] ?? 0);
+
+        if ($memberHomePageId > 0) {
+            $url = get_permalink($memberHomePageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        $fallbackMemberPortal = home_url('/member-portal/');
+        if (is_string($fallbackMemberPortal) && $fallbackMemberPortal !== '') {
+            return $fallbackMemberPortal;
+        }
+
+        return wp_login_url();
     }
 
     private function ensure_membership_number(array $member): string
@@ -211,6 +249,10 @@ class PaymentActivationService
     {
         global $wpdb;
 
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $configuredNext = max(1, absint($settings['next_membership_number'] ?? 1));
+
         $membersTable = $wpdb->prefix . 'iei_members';
         $numbers = $wpdb->get_col("SELECT membership_number FROM {$membersTable} WHERE membership_number IS NOT NULL AND membership_number <> ''");
 
@@ -224,7 +266,17 @@ class PaymentActivationService
             }
         }
 
-        return 'IEI-' . str_pad((string) ($max + 1), 6, '0', STR_PAD_LEFT);
+        $nextNumber = max($configuredNext, $max + 1);
+        $this->persist_next_membership_number($nextNumber + 1, $settings);
+
+        return 'IEI-' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function persist_next_membership_number(int $nextNumber, array $settings = []): void
+    {
+        $settings = is_array($settings) ? $settings : [];
+        $settings['next_membership_number'] = max(1, $nextNumber);
+        update_option(IEI_MEMBERSHIP_OPTION_KEY, $settings);
     }
 
     private function get_subscription(int $subscriptionId): ?array

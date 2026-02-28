@@ -90,6 +90,7 @@ class Bootstrap
 
         add_action('admin_menu', [$this, 'register_admin_menu']);
         add_action('current_screen', [$this, 'register_help_tabs']);
+        add_filter('login_redirect', [$this, 'handle_login_redirect'], 10, 3);
     }
 
     public function register_admin_menu(): void
@@ -286,5 +287,201 @@ class Bootstrap
                 . '<li>' . esc_html__('Verify role transitions: pending_payment -> member on paid, member -> pending_payment on lapse.', 'iei-membership') . '</li>'
                 . '</ul>',
         ]);
+    }
+
+    public function handle_login_redirect(string $redirectTo, string $requestedRedirectTo, $user): string
+    {
+        if (! $user instanceof \WP_User) {
+            return $redirectTo;
+        }
+
+        if (in_array('iei_director', (array) $user->roles, true)) {
+            if (method_exists($user, 'has_cap') && $user->has_cap(RolesManager::CAP_DIRECTOR_VOTE)) {
+                return $this->director_dashboard_url();
+            }
+        }
+
+        $membershipRedirect = $this->membership_login_redirect_url($user);
+        if ($membershipRedirect !== '') {
+            return $membershipRedirect;
+        }
+
+        return $redirectTo;
+    }
+
+    private function membership_login_redirect_url(\WP_User $user): string
+    {
+        $member = $this->get_member_by_wp_user_id((int) $user->ID);
+        if (! $member) {
+            return '';
+        }
+
+        $subscriptionStatus = $this->latest_subscription_status((int) $member['id']);
+        $memberStatus = (string) ($member['status'] ?? '');
+        $roles = (array) $user->roles;
+
+        $isPendingPayment = in_array('iei_pending_payment', $roles, true)
+            || $memberStatus === 'pending_payment'
+            || $subscriptionStatus === 'pending_payment';
+
+        if ($isPendingPayment) {
+            return $this->member_payment_portal_url();
+        }
+
+        $hasCurrentMembership = in_array('iei_member', $roles, true)
+            || $memberStatus === 'active'
+            || in_array($subscriptionStatus, ['active', 'overdue'], true);
+
+        if ($hasCurrentMembership) {
+            return $this->member_home_url();
+        }
+
+        return '';
+    }
+
+    private function director_dashboard_url(): string
+    {
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $pageId = absint($settings['director_dashboard_page_id'] ?? 0);
+
+        if ($pageId > 0) {
+            $url = get_permalink($pageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        global $wpdb;
+
+        $postsTable = $wpdb->posts;
+        $shortcodePageId = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT ID
+                 FROM {$postsTable}
+                 WHERE post_type = %s
+                   AND post_status = %s
+                   AND post_content LIKE %s
+                 ORDER BY ID ASC
+                 LIMIT 1",
+                'page',
+                'publish',
+                '%[iei_director_dashboard%'
+            )
+        );
+
+        if (! empty($shortcodePageId)) {
+            $url = get_permalink((int) $shortcodePageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return home_url('/');
+    }
+
+    private function member_payment_portal_url(): string
+    {
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $pageId = absint($settings['member_payment_portal_page_id'] ?? 0);
+
+        if ($pageId > 0) {
+            $url = get_permalink($pageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        $shortcodePageId = $this->first_published_page_with_shortcode('[iei_member_payment_portal');
+        if ($shortcodePageId > 0) {
+            $url = get_permalink($shortcodePageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return home_url('/');
+    }
+
+    private function member_home_url(): string
+    {
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $pageId = absint($settings['member_home_page_id'] ?? 0);
+
+        if ($pageId > 0) {
+            $url = get_permalink($pageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return home_url('/member-portal/');
+    }
+
+    private function get_member_by_wp_user_id(int $wpUserId): ?array
+    {
+        if ($wpUserId <= 0) {
+            return null;
+        }
+
+        global $wpdb;
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM {$wpdb->prefix}iei_members WHERE wp_user_id = %d LIMIT 1", $wpUserId),
+            ARRAY_A
+        );
+
+        return is_array($row) ? $row : null;
+    }
+
+    private function latest_subscription_status(int $memberId): string
+    {
+        if ($memberId <= 0) {
+            return '';
+        }
+
+        global $wpdb;
+
+        $status = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT status
+                 FROM {$wpdb->prefix}iei_subscriptions
+                 WHERE member_id = %d
+                 ORDER BY membership_year DESC, id DESC
+                 LIMIT 1",
+                $memberId
+            )
+        );
+
+        return is_string($status) ? sanitize_key($status) : '';
+    }
+
+    private function first_published_page_with_shortcode(string $shortcodePrefix): int
+    {
+        if ($shortcodePrefix === '') {
+            return 0;
+        }
+
+        global $wpdb;
+
+        $postsTable = $wpdb->posts;
+        $pageId = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT ID
+                 FROM {$postsTable}
+                 WHERE post_type = %s
+                   AND post_status = %s
+                   AND post_content LIKE %s
+                 ORDER BY ID ASC
+                 LIMIT 1",
+                'page',
+                'publish',
+                '%' . $wpdb->esc_like($shortcodePrefix) . '%'
+            )
+        );
+
+        return $pageId ? (int) $pageId : 0;
     }
 }
