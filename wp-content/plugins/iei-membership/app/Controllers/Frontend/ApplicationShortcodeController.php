@@ -35,6 +35,7 @@ class ApplicationShortcodeController
         $result = $this->maybe_handle_submission();
         $errors = $result['errors'];
         $old = $result['old'];
+        $showFileReuploadNotice = ! empty($result['show_file_reupload_notice']);
 
         $membershipType = isset($old['membership_type']) ? (string) $old['membership_type'] : 'associate';
         $nominationStatus = isset($old['nomination_status']) ? (string) $old['nomination_status'] : 'self_nominated';
@@ -66,6 +67,12 @@ class ApplicationShortcodeController
             .iei-app-form .iei-section{margin:18px 0}
             .iei-app-form .iei-card{padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
             .iei-app-form .iei-help{font-size:13px;color:#555;margin-top:6px}
+            .iei-app-form .iei-upload-input{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+            .iei-app-form .iei-upload-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+            .iei-app-form .iei-upload-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+            .iei-app-form .iei-upload-name{font-weight:500;word-break:break-all}
+            .iei-app-form .iei-upload-size{font-size:12px;color:#555}
+            .iei-app-form .iei-remove-file{border:1px solid #d0d7de;background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer}
             @media (max-width:900px){.iei-app-form .iei-grid,.iei-app-form .iei-grid-2{grid-template-columns:1fr}}
         </style>';
 
@@ -139,7 +146,14 @@ class ApplicationShortcodeController
 
         echo '<div class="iei-section">';
         echo '<label for="iei_application_files">' . esc_html__('Attachments (max 5 files, 5MB each)', 'iei-membership') . '</label>';
-        echo '<input type="file" id="iei_application_files" name="application_files[]" multiple />';
+        echo '<p class="iei-help">' . esc_html__('Add files in batches from different folders. You can remove any file before submitting.', 'iei-membership') . '</p>';
+        if ($showFileReuploadNotice) {
+            echo '<p class="iei-help" style="color:#b91c1c;font-weight:600;">' . esc_html__('Your previous submission had attachments selected, but files cannot be kept after a validation error. Please re-upload your files before submitting again.', 'iei-membership') . '</p>';
+        }
+        echo '<button type="button" id="iei_add_files_button">' . esc_html__('Add files', 'iei-membership') . '</button>';
+        echo '<input class="iei-upload-input" type="file" id="iei_application_files" name="application_files[]" multiple />';
+        echo '<p id="iei_selected_files_empty" class="iei-help">' . esc_html__('No files selected yet.', 'iei-membership') . '</p>';
+        echo '<ul id="iei_selected_files" class="iei-upload-list"></ul>';
         echo '</div>';
 
         echo '<p><button type="submit">' . esc_html__('Submit Application', 'iei-membership') . '</button></p>';
@@ -150,13 +164,135 @@ class ApplicationShortcodeController
             (function(){
                 var nomination = document.getElementById("iei_nomination_status");
                 var nominatorFields = document.getElementById("iei_nominator_fields");
-                if(!nomination || !nominatorFields){ return; }
                 function toggleNominator(){
-                    var show = nomination.value === "nominated_by_member";
-                    nominatorFields.style.display = show ? "grid" : "none";
+                    if(!nomination || !nominatorFields){ return; }
+                    nominatorFields.style.display = nomination.value === "nominated_by_member" ? "grid" : "none";
                 }
-                nomination.addEventListener("change", toggleNominator);
+
+                var fileInput = document.getElementById("iei_application_files");
+                var addFilesButton = document.getElementById("iei_add_files_button");
+                var selectedFilesList = document.getElementById("iei_selected_files");
+                var selectedFilesEmpty = document.getElementById("iei_selected_files_empty");
+                var pendingFiles = [];
+                var maxFiles = 5;
+
+                function fileKey(file){
+                    return [file.name, file.size, file.lastModified].join("::");
+                }
+
+                function formatFileSize(bytes){
+                    if(bytes < 1024){ return bytes + " B"; }
+                    if(bytes < 1048576){ return (bytes / 1024).toFixed(1) + " KB"; }
+                    return (bytes / 1048576).toFixed(2) + " MB";
+                }
+
+                function syncInputFiles(){
+                    if(!fileInput || typeof DataTransfer === "undefined"){ return; }
+                    var dataTransfer = new DataTransfer();
+                    for(var i = 0; i < pendingFiles.length; i++){
+                        dataTransfer.items.add(pendingFiles[i]);
+                    }
+                    fileInput.files = dataTransfer.files;
+                }
+
+                function renderSelectedFiles(){
+                    if(!selectedFilesList || !selectedFilesEmpty){ return; }
+                    selectedFilesList.innerHTML = "";
+                    selectedFilesEmpty.style.display = pendingFiles.length === 0 ? "block" : "none";
+                    if(addFilesButton){
+                        addFilesButton.disabled = pendingFiles.length >= maxFiles;
+                    }
+
+                    for(var i = 0; i < pendingFiles.length; i++){
+                        var file = pendingFiles[i];
+                        var listItem = document.createElement("li");
+
+                        var info = document.createElement("div");
+                        var name = document.createElement("div");
+                        var size = document.createElement("div");
+                        name.className = "iei-upload-name";
+                        size.className = "iei-upload-size";
+                        name.textContent = file.name;
+                        size.textContent = formatFileSize(file.size);
+                        info.appendChild(name);
+                        info.appendChild(size);
+
+                        var removeButton = document.createElement("button");
+                        removeButton.type = "button";
+                        removeButton.className = "iei-remove-file";
+                        removeButton.setAttribute("data-remove-index", String(i));
+                        removeButton.textContent = "Remove";
+
+                        listItem.appendChild(info);
+                        listItem.appendChild(removeButton);
+                        selectedFilesList.appendChild(listItem);
+                    }
+                }
+
+                if(addFilesButton && fileInput){
+                    addFilesButton.addEventListener("click", function(){
+                        fileInput.click();
+                    });
+
+                    fileInput.addEventListener("change", function(){
+                        var selected = Array.prototype.slice.call(fileInput.files || []);
+                        if(selected.length === 0){ return; }
+
+                        if(pendingFiles.length >= maxFiles){
+                            window.alert("' . esc_js(__('You can upload up to 5 files per application.', 'iei-membership')) . '");
+                            syncInputFiles();
+                            renderSelectedFiles();
+                            return;
+                        }
+
+                        var existing = {};
+                        for(var i = 0; i < pendingFiles.length; i++){
+                            existing[fileKey(pendingFiles[i])] = true;
+                        }
+
+                        var limitReachedDuringAdd = false;
+                        for(var j = 0; j < selected.length; j++){
+                            if(pendingFiles.length >= maxFiles){
+                                limitReachedDuringAdd = true;
+                                break;
+                            }
+                            var key = fileKey(selected[j]);
+                            if(!existing[key]){
+                                pendingFiles.push(selected[j]);
+                                existing[key] = true;
+                            }
+                        }
+
+                        if(limitReachedDuringAdd){
+                            window.alert("' . esc_js(__('Maximum of 5 files reached. Remove a file to add another.', 'iei-membership')) . '");
+                        }
+
+                        syncInputFiles();
+                        renderSelectedFiles();
+                    });
+                }
+
+                if(selectedFilesList){
+                    selectedFilesList.addEventListener("click", function(event){
+                        var target = event.target;
+                        if(!target || !target.getAttribute){ return; }
+                        var removeIndex = target.getAttribute("data-remove-index");
+                        if(removeIndex === null){ return; }
+
+                        var index = parseInt(removeIndex, 10);
+                        if(isNaN(index) || index < 0 || index >= pendingFiles.length){ return; }
+
+                        pendingFiles.splice(index, 1);
+                        syncInputFiles();
+                        renderSelectedFiles();
+                    });
+                }
+
+                if(nomination){
+                    nomination.addEventListener("change", toggleNominator);
+                }
                 toggleNominator();
+                renderSelectedFiles();
             })();
         </script>';
 
@@ -168,11 +304,14 @@ class ApplicationShortcodeController
         $response = [
             'errors' => [],
             'old' => [],
+            'show_file_reupload_notice' => false,
         ];
 
         if (! isset($_POST['iei_membership_action']) || $_POST['iei_membership_action'] !== 'submit_application') {
             return $response;
         }
+
+        $hadFilesOnSubmission = $this->had_files_on_submission($_FILES['application_files'] ?? []);
 
         $response['old'] = [
             'first_name' => sanitize_text_field(wp_unslash((string) ($_POST['first_name'] ?? ''))),
@@ -181,7 +320,7 @@ class ApplicationShortcodeController
             'address_line_1' => sanitize_text_field(wp_unslash((string) ($_POST['address_line_1'] ?? ''))),
             'address_line_2' => sanitize_text_field(wp_unslash((string) ($_POST['address_line_2'] ?? ''))),
             'suburb' => sanitize_text_field(wp_unslash((string) ($_POST['suburb'] ?? ''))),
-            'state' => sanitize_key(wp_unslash((string) ($_POST['state'] ?? ''))),
+            'state' => strtoupper(sanitize_text_field(wp_unslash((string) ($_POST['state'] ?? '')))),
             'postcode' => sanitize_text_field(wp_unslash((string) ($_POST['postcode'] ?? ''))),
             'phone' => sanitize_text_field(wp_unslash((string) ($_POST['phone'] ?? ''))),
             'mobile' => sanitize_text_field(wp_unslash((string) ($_POST['mobile'] ?? ''))),
@@ -209,12 +348,18 @@ class ApplicationShortcodeController
         $validationErrors = $this->validate_input($response['old']);
         if (! empty($validationErrors)) {
             $response['errors'] = $validationErrors;
+            if ($hadFilesOnSubmission) {
+                $response['show_file_reupload_notice'] = true;
+            }
             return $response;
         }
 
         $filesResult = $this->validate_files($_FILES['application_files'] ?? []);
         if (! empty($filesResult['errors'])) {
             $response['errors'] = $filesResult['errors'];
+            if ($hadFilesOnSubmission) {
+                $response['show_file_reupload_notice'] = true;
+            }
             return $response;
         }
 
@@ -349,7 +494,7 @@ class ApplicationShortcodeController
             $errors[] = __('Suburb is required.', 'iei-membership');
         }
 
-        $state = (string) ($input['state'] ?? '');
+        $state = strtoupper((string) ($input['state'] ?? ''));
         if (! isset($this->australian_states()[$state])) {
             $errors[] = __('Please select a valid Australian state.', 'iei-membership');
         }
@@ -476,7 +621,7 @@ class ApplicationShortcodeController
                 'address_line_1' => sanitize_text_field((string) ($input['address_line_1'] ?? '')),
                 'address_line_2' => sanitize_text_field((string) ($input['address_line_2'] ?? '')),
                 'suburb' => sanitize_text_field((string) ($input['suburb'] ?? '')),
-                'state' => sanitize_key((string) ($input['state'] ?? '')),
+                'state' => strtoupper(sanitize_text_field((string) ($input['state'] ?? ''))),
                 'postcode' => sanitize_text_field((string) ($input['postcode'] ?? '')),
                 'phone' => sanitize_text_field((string) ($input['phone'] ?? '')),
                 'mobile' => sanitize_text_field((string) ($input['mobile'] ?? '')),
@@ -619,6 +764,21 @@ class ApplicationShortcodeController
         return $honeypot === '';
     }
 
+    private function had_files_on_submission(array $fileInput): bool
+    {
+        if (! isset($fileInput['name']) || ! is_array($fileInput['name'])) {
+            return false;
+        }
+
+        foreach ($fileInput['name'] as $name) {
+            if (trim((string) $name) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function allowed_extensions(): array
     {
         $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
@@ -628,17 +788,67 @@ class ApplicationShortcodeController
             ? $settings['allowed_mime_types']
             : ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
 
-        return array_values(array_unique(array_map(static function ($value): string {
-            return strtolower(sanitize_key((string) $value));
-        }, $extensions)));
+        $mimeToExtension = [
+            'image/jpeg' => 'jpeg',
+            'image/jpg' => 'jpg',
+            'image/pjpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        ];
+
+        $normalized = [];
+        foreach ($extensions as $value) {
+            $raw = strtolower(trim((string) $value));
+            if ($raw === '') {
+                continue;
+            }
+
+            $raw = ltrim($raw, '.');
+
+            if (isset($mimeToExtension[$raw])) {
+                $normalized[] = $mimeToExtension[$raw];
+                continue;
+            }
+
+            if (strpos($raw, '/') !== false) {
+                continue;
+            }
+
+            $extension = sanitize_key($raw);
+            if ($extension !== '') {
+                $normalized[] = $extension;
+            }
+        }
+
+        $normalized = array_values(array_unique($normalized));
+        if (empty($normalized)) {
+            $normalized = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif'];
+        }
+
+        return $normalized;
     }
 
     private function allowed_membership_types(): array
     {
+        $defaults = iei_membership_default_settings();
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+
+        $prices = isset($settings['membership_type_prices']) && is_array($settings['membership_type_prices'])
+            ? $settings['membership_type_prices']
+            : [];
+
+        $associate = isset($prices['associate']) ? (float) $prices['associate'] : (float) $defaults['membership_type_prices']['associate'];
+        $corporate = isset($prices['corporate']) ? (float) $prices['corporate'] : (float) $defaults['membership_type_prices']['corporate'];
+        $senior = isset($prices['senior']) ? (float) $prices['senior'] : (float) $defaults['membership_type_prices']['senior'];
+
         return [
-            'associate' => __('Associate', 'iei-membership'),
-            'corporate' => __('Corporate', 'iei-membership'),
-            'senior' => __('Senior', 'iei-membership'),
+            'associate' => sprintf(__('Associate (AUD %s)', 'iei-membership'), number_format($associate, 2)),
+            'corporate' => sprintf(__('Corporate (AUD %s)', 'iei-membership'), number_format($corporate, 2)),
+            'senior' => sprintf(__('Senior (AUD %s)', 'iei-membership'), number_format($senior, 2)),
         ];
     }
 
