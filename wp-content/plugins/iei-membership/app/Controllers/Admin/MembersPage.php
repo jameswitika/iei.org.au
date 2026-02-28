@@ -28,6 +28,9 @@ class MembersPage
         $this->render_list();
     }
 
+    /**
+     * Render searchable members list with latest subscription snapshot columns.
+     */
     private function render_list(): void
     {
         $search = sanitize_text_field(wp_unslash((string) ($_GET['s'] ?? '')));
@@ -100,6 +103,9 @@ class MembersPage
         echo '</form>';
     }
 
+    /**
+     * Render profile/subscription/activity detail for a single member.
+     */
     private function render_detail(int $memberId): void
     {
         $row = $this->get_member($memberId);

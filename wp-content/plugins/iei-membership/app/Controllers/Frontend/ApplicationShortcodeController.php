@@ -11,6 +11,7 @@ use IEI\Membership\Services\FileStorageService;
 class ApplicationShortcodeController
 {
     private const NONCE_ACTION = 'iei_membership_application_submit';
+    private const THANK_YOU_QUERY_ARG = 'iei_application_submitted';
 
     private FileStorageService $fileStorageService;
     private ActivityLogger $activityLogger;
@@ -33,15 +34,15 @@ class ApplicationShortcodeController
     {
         $result = $this->maybe_handle_submission();
         $errors = $result['errors'];
-        $successMessage = $result['success_message'];
         $old = $result['old'];
 
         $membershipType = isset($old['membership_type']) ? (string) $old['membership_type'] : 'associate';
 
         ob_start();
 
-        if ($successMessage !== '') {
-            echo '<div class="iei-membership-notice iei-membership-notice-success">' . esc_html($successMessage) . '</div>';
+        if ($this->should_show_thank_you()) {
+            echo $this->render_thank_you_template();
+            return (string) ob_get_clean();
         }
 
         if (! empty($errors)) {
@@ -125,7 +126,6 @@ class ApplicationShortcodeController
     {
         $response = [
             'errors' => [],
-            'success_message' => '',
             'old' => [],
         ];
 
@@ -202,11 +202,79 @@ class ApplicationShortcodeController
         $this->notify_preapproval_officer($applicationId, $response['old']);
 
         if (empty($response['errors'])) {
-            $response['success_message'] = __('Application submitted successfully. Our pre-approval officer will review it shortly.', 'iei-membership');
-            $response['old'] = [];
+            $this->redirect_after_successful_submission();
         }
 
         return $response;
+    }
+
+    /**
+     * Post/Redirect/Get after successful submission to prevent form re-posts.
+     */
+    private function redirect_after_successful_submission(): void
+    {
+        $redirectUrl = $this->thank_you_url();
+        if (! headers_sent()) {
+            wp_safe_redirect($redirectUrl);
+            exit;
+        }
+    }
+
+    /**
+     * Build thank-you URL with a flag that switches shortcode output to template mode.
+     */
+    private function thank_you_url(): string
+    {
+        return add_query_arg([self::THANK_YOU_QUERY_ARG => '1'], $this->thank_you_base_url());
+    }
+
+    /**
+     * Resolve destination page for successful submit redirect from settings.
+     */
+    private function thank_you_base_url(): string
+    {
+        $settings = get_option(IEI_MEMBERSHIP_OPTION_KEY, []);
+        $settings = is_array($settings) ? $settings : [];
+        $pageId = absint($settings['application_thank_you_page_id'] ?? 0);
+
+        if ($pageId > 0) {
+            $url = get_permalink($pageId);
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return $this->current_url();
+    }
+
+    /**
+     * Determine whether shortcode should show thank-you template instead of form.
+     */
+    private function should_show_thank_you(): bool
+    {
+        return (string) ($_GET[self::THANK_YOU_QUERY_ARG] ?? '') === '1';
+    }
+
+    /**
+     * Render post-submission user guidance shown after successful application.
+     */
+    private function render_thank_you_template(): string
+    {
+        ob_start();
+
+        echo '<div class="iei-membership-thank-you">';
+        echo '<h2>' . esc_html__('Thank you for your application', 'iei-membership') . '</h2>';
+        echo '<p>' . esc_html__('Your membership application has been submitted successfully.', 'iei-membership') . '</p>';
+        echo '<p>' . esc_html__('What happens next:', 'iei-membership') . '</p>';
+        echo '<ul>';
+        echo '<li>' . esc_html__('Our pre-approval officer will review your application and attachments.', 'iei-membership') . '</li>';
+        echo '<li>' . esc_html__('If pre-approved, your application is sent to the board for director voting.', 'iei-membership') . '</li>';
+        echo '<li>' . esc_html__('If approved, you will receive an email with account setup and payment instructions.', 'iei-membership') . '</li>';
+        echo '<li>' . esc_html__('After payment is receipted, your membership is activated and you can access the member portal.', 'iei-membership') . '</li>';
+        echo '</ul>';
+        echo '</div>';
+
+        return (string) ob_get_clean();
     }
 
     private function validate_input(array $input): array
@@ -464,5 +532,14 @@ class ApplicationShortcodeController
             'self_nominated' => __('Self nominated', 'iei-membership'),
             'nominated_by_member' => __('Nominated by member', 'iei-membership'),
         ];
+    }
+
+    private function current_url(): string
+    {
+        $scheme = is_ssl() ? 'https://' : 'http://';
+        $host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_HOST'])) : '';
+        $requestUri = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
+
+        return esc_url_raw($scheme . $host . $requestUri);
     }
 }

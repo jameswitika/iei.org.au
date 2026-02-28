@@ -64,6 +64,7 @@ function iei_membership_default_settings(): array
         'director_dashboard_page_id' => 0,
         'member_payment_portal_page_id' => 0,
         'member_home_page_id' => 0,
+        'application_thank_you_page_id' => 0,
         'next_membership_number' => 1,
     ];
 }

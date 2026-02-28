@@ -76,6 +76,7 @@ class SettingsPage
             'grace_period_days' => ['Grace period (days)', 'number'],
             'prorata_cutoff_days' => ['Pro-rata cutoff (days)', 'number'],
             'director_dashboard_page_id' => ['Director dashboard page', 'page_select'],
+            'application_thank_you_page_id' => ['Application thank you page', 'page_select'],
             'member_payment_portal_page_id' => ['Membership payment portal page', 'page_select'],
             'member_home_page_id' => ['Member home page', 'page_select'],
             'next_membership_number' => ['Next membership number', 'number'],
@@ -211,6 +212,7 @@ class SettingsPage
         $gracePeriodDays = max(0, absint($input['grace_period_days'] ?? $defaults['grace_period_days']));
         $prorataCutoffDays = max(0, absint($input['prorata_cutoff_days'] ?? $defaults['prorata_cutoff_days']));
         $directorDashboardPageId = absint($input['director_dashboard_page_id'] ?? $defaults['director_dashboard_page_id']);
+        $applicationThankYouPageId = absint($input['application_thank_you_page_id'] ?? $defaults['application_thank_you_page_id']);
         $memberPaymentPortalPageId = absint($input['member_payment_portal_page_id'] ?? $defaults['member_payment_portal_page_id']);
         $memberHomePageId = absint($input['member_home_page_id'] ?? $defaults['member_home_page_id']);
         $nextMembershipNumber = max(1, absint($input['next_membership_number'] ?? $defaults['next_membership_number']));
@@ -240,6 +242,7 @@ class SettingsPage
             'grace_period_days' => $gracePeriodDays,
             'prorata_cutoff_days' => $prorataCutoffDays,
             'director_dashboard_page_id' => $directorDashboardPageId,
+            'application_thank_you_page_id' => $applicationThankYouPageId,
             'member_payment_portal_page_id' => $memberPaymentPortalPageId,
             'member_home_page_id' => $memberHomePageId,
             'next_membership_number' => $nextMembershipNumber,

@@ -1,5 +1,25 @@
 # IEI Membership Plugin — Agent Instructions (Codex)
 
+## Current Implementation Status (March 2026)
+Implemented:
+- Public application form shortcode with validation, attachment handling, notification to pre-approval officer.
+- Post-submit application redirect to configurable Thank You page and thank-you template rendering.
+- Pre-approval and board workflow with director assignment, voting, reminder/reset actions, threshold auto-finalisation.
+- Approval pipeline: WP user provisioning, pending-payment role, member row/subscription row creation, approval emails.
+- Protected file storage + permission-gated stream endpoint (admin/pre-approval/assigned director).
+- Director dashboard shortcode with list/detail, file preview/download, and voting.
+- Payment admin queue and manual mark-paid activation flow.
+- Payment activation email with welcome messaging and member-home/login link.
+- Daily maintenance cron for overdue/lapsed transitions and role downgrade.
+- CSV import for active members.
+- Members admin list + detail view with latest subscription snapshot and recent activity timeline.
+- Configurable login redirects for directors, pending-payment users, and active/current members.
+- Configurable next membership number counter with safe auto-increment.
+
+Partially implemented / scaffold-only:
+- Subscriptions admin page is currently scaffolded.
+- Activity Log admin page is currently scaffolded.
+
 ## Purpose
 Build a custom WordPress plugin that manages:
 - Public membership applications (with secure file uploads)
@@ -60,6 +80,10 @@ Submenus:
 - Activity Log
 - Import Members (CSV)
 
+Note:
+- Members submenu is implemented (search/list/detail + activity snapshot).
+- Subscriptions and Activity Log submenu pages remain scaffold placeholders.
+
 ## Public / Front-end Shortcodes
 - `[iei_membership_application]` -> public application form (no login)
 - `[iei_director_dashboard]` -> director portal (login required)
@@ -118,6 +142,15 @@ Key settings:
 - bank_transfer_enabled (true)
 - bank_transfer_instructions (text)
 - active_gateway (`stripe` or `paypal`) (placeholder; not fully implemented in v1)
+- director_dashboard_page_id (frontend page for director dashboard)
+- member_payment_portal_page_id (frontend page for payment portal)
+- member_home_page_id (frontend page for active member landing)
+- application_thank_you_page_id (frontend page used after successful application submit)
+- next_membership_number (numeric counter for next assigned membership number)
+
+Behavior notes:
+- `next_membership_number` is treated as the minimum next number; runtime also checks DB max and uses the higher value.
+- After assignment, `next_membership_number` is automatically incremented.
 
 ## Cron Job
 Daily WP-Cron event `iei_daily_maintenance`:
@@ -133,8 +166,8 @@ Events:
 - Board review needed -> directors
 - Director reminder (manual trigger) -> only non-responders
 - Approved -> applicant (includes login/password set instructions + payment steps)
-- Approved -> Stuart
-- Payment received -> applicant
+- Approved -> Stuart (includes applicant name/company/membership type)
+- Payment received -> applicant (personalized welcome + member area link)
 
 ## Security Requirements
 - Nonces on all POST actions
@@ -150,6 +183,10 @@ Keep code clean and separated:
 - Repositories (DB access)
 - Views (PHP templates)
 - Migrations (table creation)
+
+Practical note:
+- Current implementation uses Controllers + Services + Migrations with direct `$wpdb` access in controllers/services.
+- Repositories/Models/Views folders are not required for current codebase behavior.
 
 ## Suggested structure:
 iei-membership/
@@ -184,3 +221,13 @@ agent.md
 - Working plugin with above features
 - Minimal developer docs in code + this agent.md
 - No excessive documentation
+
+## Important Runtime Notes
+- Application thank-you redirect:
+   - On successful submit, shortcode redirects to `application_thank_you_page_id` if configured, else current URL.
+   - Thank-you template is shown when `?iei_application_submitted=1` is present.
+   - If using a separate Thank You page and you want the in-plugin thank-you template, include `[iei_membership_application]` on that page.
+- Login redirects:
+   - Director users with vote cap -> configured director dashboard page.
+   - Pending-payment users -> configured member payment portal page.
+   - Active/current members -> configured member home page (fallback `/member-portal/`).
