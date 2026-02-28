@@ -433,12 +433,21 @@ class ApplicationShortcodeController
             return;
         }
 
+        $reviewUrl = add_query_arg(
+            [
+                'page' => 'iei-membership-applications',
+                'application_id' => $applicationId,
+            ],
+            admin_url('admin.php')
+        );
+
         $subjectTemplate = 'New membership application #{application_id}';
         $bodyTemplate = "A new membership application requires pre-approval.\n\n"
             . "Application ID: {application_id}\n"
             . "Applicant: {first_name} {last_name}\n"
             . "Email: {email}\n"
-            . "Membership type: {membership_type}\n";
+            . "Membership type: {membership_type}\n"
+            . "Review URL: {review_url}\n";
 
         $tokens = [
             '{application_id}' => (string) $applicationId,
@@ -446,6 +455,7 @@ class ApplicationShortcodeController
             '{last_name}' => (string) ($input['last_name'] ?? ''),
             '{email}' => (string) ($input['email'] ?? ''),
             '{membership_type}' => (string) ($input['membership_type'] ?? ''),
+            '{review_url}' => $reviewUrl,
         ];
 
         $subject = strtr($subjectTemplate, $tokens);
