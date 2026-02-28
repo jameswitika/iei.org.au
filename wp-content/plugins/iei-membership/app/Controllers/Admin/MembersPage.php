@@ -68,11 +68,11 @@ class MembersPage
 
                 echo '<tr>';
                 echo '<td>' . esc_html((string) ($row['membership_number'] ?: '-')) . '</td>';
-                echo '<td>' . esc_html($fullName !== '' ? $fullName : '-') . '</td>';
+                echo '<td><a href="' . esc_url($detailUrl) . '">' . esc_html($fullName !== '' ? $fullName : '-') . '</a></td>';
                 echo '<td>' . esc_html((string) ($row['user_email'] ?: $row['applicant_email'] ?: '-')) . '</td>';
                 echo '<td>' . esc_html((string) ($row['membership_type'] ?: '-')) . '</td>';
                 echo '<td>' . esc_html((string) ($row['member_status'] ?: '-')) . '</td>';
-                echo '<td>' . esc_html((string) ($row['subscription_status'] ?: '-')) . '</td>';
+                echo '<td>' . $this->render_subscription_status_chip((string) ($row['subscription_status'] ?? '')) . '</td>';
                 echo '<td>' . esc_html((string) ($row['membership_year'] ?: '-')) . '</td>';
                 echo '<td><a class="button button-small" href="' . esc_url($detailUrl) . '">' . esc_html__('View', 'iei-membership') . '</a></td>';
                 echo '</tr>';
@@ -223,6 +223,37 @@ class MembersPage
     private function detail_row(string $label, string $value): void
     {
         echo '<tr><th>' . esc_html($label) . '</th><td>' . esc_html($value) . '</td></tr>';
+    }
+
+    private function render_subscription_status_chip(string $status): string
+    {
+        $status = sanitize_key($status);
+
+        $styles = [
+            'pending_payment' => [
+                'label' => __('pending_payment', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#ffedd5;color:#9a3412;font-weight:600;text-transform:capitalize;',
+            ],
+            'overdue' => [
+                'label' => __('overdue', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#fee2e2;color:#991b1b;font-weight:600;text-transform:capitalize;',
+            ],
+            'lapsed' => [
+                'label' => __('lapsed', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#fee2e2;color:#991b1b;font-weight:600;text-transform:capitalize;',
+            ],
+            'active' => [
+                'label' => __('active', 'iei-membership'),
+                'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#dcfce7;color:#166534;font-weight:600;text-transform:capitalize;',
+            ],
+        ];
+
+        $meta = $styles[$status] ?? [
+            'label' => $status !== '' ? $status : '-',
+            'style' => 'display:inline-block;padding:4px 10px;border-radius:9999px;background:#e5e7eb;color:#374151;font-weight:600;text-transform:capitalize;',
+        ];
+
+        return '<span style="' . esc_attr($meta['style']) . '">' . esc_html((string) $meta['label']) . '</span>';
     }
 
     private function query_members(string $search, string $status): array
